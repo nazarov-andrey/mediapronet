@@ -123,7 +123,8 @@ public class MeshMaker : MonoBehaviour
                         .BackContour
                         .ConvertAll (x => AbsoluteOpeningVertexToRelative (origin, x));
                     var openingMatrix = Matrix4x4.TRS (origin, Quaternion.Euler (0f, 0f, backWallAngle), Vector3.one);
-                    CreateMesh ("jamb back wall", backContourVertexes, dummyHoles, flipFaces, true, openingMatrix);
+                    gos.Add (
+                        CreateMesh ("jamb back wall", backContourVertexes, dummyHoles, flipFaces, true, openingMatrix));
                 }
 
                 var openingJambVertices = opening
@@ -172,8 +173,8 @@ public class MeshMaker : MonoBehaviour
                 new Wall.Openings
                 {
                     new SegmentsOpening (
-                        OpeningType.Through,
-                        float.MaxValue,
+                        OpeningType.Inner,
+                        0.15f,
                         new StreightLineSegment (new Vector2 (1f, 0f), new Vector2 (1f, 1f)),
                         new QuadraticBezierSegment (
                             new Vector2 (1f, 1f),
@@ -192,7 +193,7 @@ public class MeshMaker : MonoBehaviour
 
                     new SegmentsOpening (
                         OpeningType.Through,
-                        float.MaxValue,
+                        0.1f,
                         new QuadraticBezierSegment (
                             new Vector2 (1.5f, 1.6f),
                             new Vector2 (1.25f, 1.6f),
@@ -240,7 +241,7 @@ public class MeshMaker : MonoBehaviour
                         new Vector2 (1f, 0f),
                         new Vector2 (1f, 1.75f))
                 },
-                Wall.WidthChangeType.Type2),
+                Wall.WidthChangeType.Type1),
             new Wall (
                 new Vector2 (6f, 7f),
                 new Vector2 (8f, 7f),
