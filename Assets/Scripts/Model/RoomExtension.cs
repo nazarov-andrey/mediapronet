@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Geometry;
 using Model.RoomGeometry;
-using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -83,36 +82,91 @@ namespace Model
                     if (wall.widthChangeType == Wall.WidthChangeType.Type2)
                         endWidth = nextWall.Width / 2f;
 
-                    nextInnerPoint = wall.End.TransposePoint(wallLines.InnerNormal, endWidth);
-                    nextOuterPoint = wall.End.TransposePoint(wallLines.OuterNormal, endWidth);
+                    nextInnerPoint = wall.End.TransposePoint (wallLines.InnerNormal, endWidth);
+                    nextOuterPoint = wall.End.TransposePoint (wallLines.OuterNormal, endWidth);
                 }
-
-                inner.Add (new RoomGeometry.Wall (innerPoint.Value, nextInnerPoint.Value, innerOpenings));
-                outer.Add (new RoomGeometry.Wall (outerPoint.Value, nextOuterPoint.Value, outerOpenings));
 
                 var actualInnerLine = Line.Create (innerPoint.Value, nextInnerPoint.Value);
                 var actualOuterLine = Line.Create (outerPoint.Value, nextOuterPoint.Value);
 
                 foreach (var opening in wall.openings) {
-                    innerOpenings.Add (
-                        new Opening (
-                            opening.Conoutour.ConvertAll (
-                                x =>
-                                    RelativeOpeningToAbsolute (
-                                        wall,
-                                        x,
-                                        () => actualInnerLine,
-                                        () => wallLines.InnerNormal))));
-                    outerOpenings.Add (
-                        new Opening (
+                    OpeningContour frontContour, backContour;
+                    Opening innerOpening = null, outerOpening = null;
+
+                    if (opening.OpeningType.HasFlag (OpeningType.Outer)) {
+                        frontContour = new OpeningContour (
                             opening.Conoutour.ConvertAll (
                                 x =>
                                     RelativeOpeningToAbsolute (
                                         wall,
                                         x,
                                         () => actualOuterLine,
-                                        () => wallLines.OuterNormal))));
+                                        () => wallLines.OuterNormal)));
+
+                        backContour = null;
+                        if (opening.OpeningType != OpeningType.Through) {
+                            var wallNormal = actualOuterLine.GetNormalVector () * -1;
+                            backContour = new OpeningContour (
+                                frontContour.ConvertAll (x => x.TransposePoint (wallNormal, opening.Depth)));
+                        }
+
+                        outerOpening = new Opening (frontContour, backContour);
+                        outerOpenings.Add (outerOpening);
+                    }
+
+                    if (opening.OpeningType.HasFlag (OpeningType.Inner)) {
+                        frontContour = new OpeningContour (
+                            opening.Conoutour.ConvertAll (
+                                x =>
+                                    RelativeOpeningToAbsolute (
+                                        wall,
+                                        x,
+                                        () => actualInnerLine,
+                                        () => wallLines.InnerNormal)));
+
+                        bool HasBackWall = opening.OpeningType != OpeningType.Through;
+                        if (HasBackWall) {
+                            var wallNormal = actualInnerLine.GetNormalVector ();
+                            backContour = new OpeningContour (
+                                frontContour.ConvertAll (x => x.TransposePoint (wallNormal, opening.Depth)));
+                        } else {
+                            Assert.IsNotNull (outerOpening);
+                            backContour = outerOpening.FrontContour;
+                        }
+
+                        innerOpening = new Opening (frontContour, backContour, HasBackWall);
+                        innerOpenings.Add (innerOpening);
+                    }
+
+/*                    if (opening.OpeningType.HasFlag(OpeningType.Inner))
+                        innerOpenings.Add (
+                            new Opening (
+                                opening.OpeningType,
+                                opening.Depth,
+                                opening.Conoutour.ConvertAll (
+                                    x =>
+                                        RelativeOpeningToAbsolute (
+                                            wall,
+                                            x,
+                                            () => actualInnerLine,
+                                            () => wallLines.InnerNormal))));
+                    
+                    if (opening.OpeningType.HasFlag(OpeningType.Outer))
+                        outerOpenings.Add (
+                            new Opening (
+                                opening.OpeningType,
+                                opening.Depth,
+                                opening.Conoutour.ConvertAll (
+                                    x =>
+                                        RelativeOpeningToAbsolute (
+                                            wall,
+                                            x,
+                                            () => actualOuterLine,
+                                            () => wallLines.OuterNormal))));*/
                 }
+
+                inner.Add (new RoomGeometry.Wall (innerPoint.Value, nextInnerPoint.Value, innerOpenings));
+                outer.Add (new RoomGeometry.Wall (outerPoint.Value, nextOuterPoint.Value, outerOpenings));
             }
 
             return new RoomGeometry.Geometry (inner, outer);

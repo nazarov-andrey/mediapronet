@@ -53,8 +53,13 @@ namespace Geometry
             Vector2 cross;
             if (!line.Cross (projectLine, out cross))
                 throw new ArgumentException ();
-            
+
             return cross;
+        }
+
+        public static Vector2 GetNormalVector (this Line line)
+        {
+            return new Vector2 (line.A, line.B);
         }
     }
 }

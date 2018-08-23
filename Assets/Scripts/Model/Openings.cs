@@ -1,13 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Geometry;
 using UnityEngine;
 
 namespace Model
 {
+    [Flags]
     public enum OpeningType
     {
-        Inner,
-        Outer
+        Inner = 1,
+        Outer = 2,
+        Through = Inner | Outer
     }
 
     public interface IOpening

@@ -4,21 +4,35 @@ using UnityEngine;
 
 namespace Model.RoomGeometry
 {
-    public class Opening : List<Vector3>
+    public class OpeningContour : List<Vector3>
     {
-        public Opening ()
+        public OpeningContour ()
         {
         }
 
-        public Opening ([NotNull] IEnumerable<Vector3> collection) : base (collection)
+        public OpeningContour ([NotNull] IEnumerable<Vector3> collection) : base (collection)
         {
         }
 
-        public Opening (int capacity) : base (capacity)
+        public OpeningContour (int capacity) : base (capacity)
         {
         }
-    }    
+    }
     
+    public class Opening
+    {
+        public readonly OpeningContour FrontContour;
+        public readonly OpeningContour BackContour;
+        public readonly bool HasBackWall;
+
+        public Opening (OpeningContour frontContour, OpeningContour backContour, bool hasBackWall = true)
+        {
+            FrontContour = frontContour;
+            BackContour = backContour;
+            HasBackWall = hasBackWall;
+        }
+    }
+
     public class Openings : List<Opening>
     {
     }
