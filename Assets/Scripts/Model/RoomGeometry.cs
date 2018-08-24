@@ -35,6 +35,17 @@ namespace Model.RoomGeometry
 
     public class Openings : List<Opening>
     {
+        public Openings ()
+        {
+        }
+
+        public Openings ([NotNull] IEnumerable<Opening> collection) : base (collection)
+        {
+        }
+
+        public Openings (int capacity) : base (capacity)
+        {
+        }
     }
 
     public struct Wall

@@ -6,8 +6,7 @@ using Geometry;
 using Model;
 using Model.RoomGeometry;
 using UnityEngine;
-using SquareOpening = Model.SquareOpening;
-using Wall = Model.Wall;
+using Wall = Model.RoomGeometry.Wall;
 
 public class MeshMaker : MonoBehaviour
 {
@@ -22,7 +21,7 @@ public class MeshMaker : MonoBehaviour
 
     private List<List<Vector2>> dummyHoles = new List<List<Vector2>> ();
 
-    private GameObject CreateMesh (string name, Vector3[] vertices, int[] triangles, bool flipFaces, Matrix4x4 matrix)
+    private GameObject CreateMesh (string name, Vector3[] vertices, int[] triangles, bool flipFaces)
     {
         var mesh = new Mesh ();
 
@@ -70,8 +69,7 @@ public class MeshMaker : MonoBehaviour
                 .ConvertAll (x => flipYZ ? FlipYZ (x) : x)
                 .ToArray (),
             indices.ToArray (),
-            flipFaces,
-            matrix);
+            flipFaces);
     }
 
     private Vector2 AbsoluteOpeningVertexToRelative (Vector2 origin, Vector3 vertex)
@@ -110,21 +108,46 @@ public class MeshMaker : MonoBehaviour
                     continue;
 
                 if (opening.HasBackWall) {
-                    var backConoutour = opening.BackContour;
+                    var backConoutour = opening
+                        .BackContour
+                        .ConvertAll (FlipYZ);
+
                     var plane = new Plane (
-                        FlipYZ (backConoutour[0]),
-                        FlipYZ (backConoutour[1]),
-                        FlipYZ (backConoutour[2]));
+                        backConoutour[0],
+                        backConoutour[1],
+                        backConoutour[2]);
                     var planeNormal = plane.normal;
                     var backWallAngle = Mathf.Atan2 (planeNormal.z, planeNormal.x) * Mathf.Rad2Deg + 90f;
 
-                    var origin = new Vector2 (backConoutour[0].x, backConoutour[0].y);
-                    var backContourVertexes = opening
-                        .BackContour
-                        .ConvertAll (x => AbsoluteOpeningVertexToRelative (origin, x));
-                    var openingMatrix = Matrix4x4.TRS (origin, Quaternion.Euler (0f, 0f, backWallAngle), Vector3.one);
-                    gos.Add (
-                        CreateMesh ("jamb back wall", backContourVertexes, dummyHoles, flipFaces, true, openingMatrix));
+                    var origin = backConoutour[0];
+                    var inverseOpeningMatrix =
+                        Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (0f, backWallAngle, 0f), Vector3.one) *
+                        Matrix4x4.TRS (-origin, Quaternion.identity, Vector3.one);
+
+                    var openingMatrix =
+                        Matrix4x4.TRS (origin, Quaternion.identity, Vector3.one) *
+                        Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (-90f, -backWallAngle, 0f), Vector3.one);
+
+/*                    var a = backConoutour
+                        .ConvertAll (x => inverseOpeningMatrix.MultiplyPoint (x));*/
+
+                    var backContourVertexes = backConoutour
+                        .ConvertAll (x => inverseOpeningMatrix.MultiplyPoint (x))
+                        .ConvertAll (x => new Vector2 (x.x, x.y));
+
+/*                    for (int count = backConoutour.Count, i = 0; i < count; i++) {
+                        Debug.DrawLine (backConoutour[i], backConoutour[(i + 1) % count], Color.red, float.MaxValue);
+                        Debug.DrawLine (a[i], a[(i + 1) % count], Color.green, float.MaxValue);
+                    }*/
+
+                    var jambBackWall = CreateMesh (
+                        "jamb back wall",
+                        backContourVertexes,
+                        dummyHoles,
+                        flipFaces,
+                        false,
+                        openingMatrix);
+                    gos.Add (jambBackWall);
                 }
 
                 var openingJambVertices = opening
@@ -151,8 +174,7 @@ public class MeshMaker : MonoBehaviour
                         "opening jamb",
                         openingJambVertices.ToArray (),
                         openingJambTriangles.ToArray (),
-                        flipFaces,
-                        Matrix4x4.identity));
+                        flipFaces));
             }
 
             var go = CreateMesh (name, vertices, holes, flipFaces, true, matrix);
@@ -166,11 +188,11 @@ public class MeshMaker : MonoBehaviour
     private void CreateRoom ()
     {
         room = new Room (
-            new Wall (
+            new Model.Wall (
                 new Vector2 (0f, 2f),
-                new Vector2 (0f, 5f),
+                new Vector2 (1f, 5f),
                 wallWidth,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SegmentsOpening (
                         OpeningType.Inner,
@@ -192,7 +214,7 @@ public class MeshMaker : MonoBehaviour
                         new StreightLineSegment (new Vector2 (2f, 0f), new Vector2 (1f, 0f))),
 
                     new SegmentsOpening (
-                        OpeningType.Through,
+                        OpeningType.Outer,
                         0.1f,
                         new QuadraticBezierSegment (
                             new Vector2 (1.5f, 1.6f),
@@ -215,20 +237,20 @@ public class MeshMaker : MonoBehaviour
                             new Vector2 (1.5f, 1.6f),
                             10))
                 }),
-            new Wall (
-                new Vector2 (0f, 5f),
-                new Vector2 (0f, 7f),
+            new Model.Wall (
+                new Vector2 (1f, 5f),
+                new Vector2 (1f, 7f),
                 wallWidth,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
 //                    new SquareOpening (new Vector2 (1f, 0.75f), new Vector2 (1f, 1.25f)),
 //                    new SquareOpening (new Vector2 (3f, 0.75f), new Vector2 (1f, 1.25f))
                 }),
-            new Wall (
-                new Vector2 (0f, 7f),
+            new Model.Wall (
+                new Vector2 (1f, 7f),
                 new Vector2 (6f, 7f),
                 wallWidth * 7f,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SquareOpening (
                         OpeningType.Inner,
@@ -241,17 +263,17 @@ public class MeshMaker : MonoBehaviour
                         new Vector2 (1f, 0f),
                         new Vector2 (1f, 1.75f))
                 },
-                Wall.WidthChangeType.Type1),
-            new Wall (
+                Model.Wall.WidthChangeType.Type2),
+            new Model.Wall (
                 new Vector2 (6f, 7f),
                 new Vector2 (8f, 7f),
                 wallWidth,
-                new Wall.Openings ()),
-            new Wall (
+                new Model.Wall.Openings ()),
+            new Model.Wall (
                 new Vector2 (8f, 7f),
                 new Vector2 (12f, 5f),
                 wallWidth,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SquareOpening (
                         OpeningType.Through,
@@ -264,11 +286,11 @@ public class MeshMaker : MonoBehaviour
                         new Vector2 (3f, 0.75f),
                         new Vector2 (1f, 1.25f))
                 }),
-            new Wall (
+            new Model.Wall (
                 new Vector2 (12f, 5f),
                 new Vector2 (12f, 2f),
                 wallWidth,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SquareOpening (
                         OpeningType.Through,
@@ -276,11 +298,11 @@ public class MeshMaker : MonoBehaviour
                         new Vector2 (0.5f, 0.75f),
                         new Vector2 (1f, 1.25f))
                 }),
-            new Wall (
+            new Model.Wall (
                 new Vector2 (12f, 2f),
                 new Vector2 (10f, 0f),
                 wallWidth,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SquareOpening (
                         OpeningType.Through,
@@ -288,11 +310,11 @@ public class MeshMaker : MonoBehaviour
                         new Vector2 (1f, 0f),
                         new Vector2 (1f, 1.75f))
                 }),
-            new Wall (
+            new Model.Wall (
                 new Vector2 (10f, 0f),
                 new Vector2 (2f, 0f),
                 wallWidth * 2,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SquareOpening (
                         OpeningType.Through,
@@ -315,18 +337,32 @@ public class MeshMaker : MonoBehaviour
                         new Vector2 (4.75f, 0.75f),
                         new Vector2 (1f, 1.25f))
                 }),
-            new Wall (
+            new Model.Wall (
                 new Vector2 (2f, 0f),
                 new Vector2 (0f, 2f),
                 wallWidth,
-                new Wall.Openings
+                new Model.Wall.Openings
                 {
                     new SquareOpening (
-                        OpeningType.Through,
-                        float.MaxValue,
+                        OpeningType.Outer,
+                        0.1f,
                         new Vector2 (1f, 0f),
                         new Vector2 (1f, 1.75f))
                 }));
+
+/*        room = new Room (
+            new Model.Wall (new Vector2 (0f, 2f), new Vector2 (0f, 5f), wallWidth, new Model.Wall.Openings ()),
+            new Model.Wall (new Vector2 (0f, 5f), new Vector2 (5f, 5f), wallWidth, new Model.Wall.Openings ()),
+            new Model.Wall (new Vector2 (5f, 5f), new Vector2 (5f, 0f), wallWidth, new Model.Wall.Openings ()),
+            new Model.Wall (new Vector2 (5f, 0f), new Vector2 (2f, 0f), wallWidth, new Model.Wall.Openings ()),
+            new Model.Wall (
+                new Vector2 (2f, 0f),
+                new Vector2 (0f, 2f),
+                wallWidth,
+                new Model.Wall.Openings
+                {
+                    new SquareOpening (OpeningType.Outer, 0.1f, new Vector2 (0.5f, 0f), new Vector2 (1f, 1.75f))
+                }));*/
     }
 
     private void Start ()
@@ -336,9 +372,9 @@ public class MeshMaker : MonoBehaviour
     }
 
     private void CreateWallJamb (
-        Model.RoomGeometry.Wall innerWall,
-        Model.RoomGeometry.Wall outerWall,
-        Func<Model.RoomGeometry.Wall, Vector2> endGetter,
+        Wall innerWall,
+        Wall outerWall,
+        Func<Wall, Vector2> endGetter,
         bool flipFaces)
     {
         var innerEnd = endGetter (innerWall);
@@ -353,7 +389,7 @@ public class MeshMaker : MonoBehaviour
         };
 
         var triangles = new[] {0, 3, 1, 3, 2, 1};
-        var go = CreateMesh ("wall jamb", vertices, triangles, flipFaces, Matrix4x4.identity);
+        var go = CreateMesh ("wall jamb", vertices, triangles, flipFaces);
 
         gos.Add (go);
     }
