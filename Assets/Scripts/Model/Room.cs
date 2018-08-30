@@ -4,11 +4,11 @@ namespace Model
 {
     public class Room
     {
-        public List<Wall> Walls;
+        public List<IWall> Walls;
 
-        public Room (params Wall[] walls)
+        public Room (params IWall[] walls)
         {
-            Walls = new List<Wall> (walls);
+            Walls = new List<IWall> (walls);
         }
     }
 }

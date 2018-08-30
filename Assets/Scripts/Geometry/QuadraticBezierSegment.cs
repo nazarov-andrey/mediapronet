@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Geometry
 {
@@ -11,13 +10,15 @@ namespace Geometry
 
         public QuadraticBezierSegment (Vector2 p0, Vector2 p1, Vector2 p2, int quality)
         {
+            quality = Mathf.Max (3, quality);
+
             this.p0 = p0;
             this.p1 = p1;
             this.p2 = p2;
 
-            Points = new List<Vector2> ();
+            Points = new Points ();
             for (int i = 0; i < quality; i++) {
-                Points.Add (Calculate ((float) i / quality));
+                Points.Add (Calculate ((float) i / (quality - 1)));
             }
         }
 
@@ -26,6 +27,6 @@ namespace Geometry
             return Mathf.Pow (1 - t, 2f) * p0 + 2 * (1 - t) * t * p1 + Mathf.Pow (t, 2f) * p2;
         }
 
-        public List<UnityEngine.Vector2> Points { get; }
+        public Points Points { get; }
     }
 }

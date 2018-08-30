@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Geometry;
-using Model.RoomGeometry;
+using RoomGeometry;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -10,7 +10,7 @@ namespace Model
     public static class RoomExtension
     {
         private static Vector3 RelativeOpeningToAbsolute (
-            Wall wall,
+            IWall wall,
             Vector2 relative,
             Func<Line> lineGetter,
             Func<Vector2> directionGetter)
@@ -24,37 +24,53 @@ namespace Model
 
         public static RoomGeometry.Geometry GenerateGeometry (this Room room)
         {
-            var innerPoints = new List<Vector2?> ();
-            var outerPoints = new List<Vector2?> ();
+            var innerPoints = new List<Tuple<Vector2?, List<Vector2>>> ();
+            var outerPoints = new List<Tuple<Vector2?, List<Vector2>>> ();
             var walls = room.Walls;
 
             for (int count = walls.Count, i = count - 1; i < count * 2 - 1; i++) {
                 var wall = walls[i % count];
                 var nextWall = walls[(i + 1) % count];
-                var wallLines = wall.lines;
-                var nextWallLines = nextWall.lines;
+                var wallLines = wall.EndLines;
+                var nextWallLines = nextWall.StartLines;
                 Vector2 cross;
 
+                Vector2? innerPoint = null, outerPoint = null;
+
                 if (wallLines.Inner.Cross (nextWallLines.Inner, out cross)) {
-                    innerPoints.Add (cross);
+                    innerPoint = cross;
                     Assert.IsTrue (wallLines.Outer.Cross (nextWallLines.Outer, out cross));
-                    outerPoints.Add (cross);
+                    outerPoint = cross;
                 } else {
-                    switch (wall.widthChangeType) {
-                        case Wall.WidthChangeType.Type1:
-                            innerPoints.Add (null);
-                            outerPoints.Add (null);
+                    switch (wall.WidthChangeType) {
+                        case WidthChangeType.Type1:
                             break;
-                        case Wall.WidthChangeType.Type2:
-                            innerPoints.Add (
-                                nextWallLines.Inner.ProjectPoint (nextWall.Start, nextWallLines.InnerNormal));
-                            outerPoints.Add (
-                                nextWallLines.Outer.ProjectPoint (nextWall.Start, nextWallLines.OuterNormal));
+                        case WidthChangeType.Type2:
+                            innerPoint = nextWallLines.Inner.ProjectPoint (nextWall.Start, nextWallLines.InnerNormal);
+                            outerPoint = nextWallLines.Outer.ProjectPoint (nextWall.Start, nextWallLines.OuterNormal);
                             break;
                         default:
                             throw new ArgumentOutOfRangeException ();
                     }
                 }
+
+                var innerWallPoints = wall.InnerLine;
+                var outerWallPoints = wall.OuterLine;
+
+                List<Vector2> innerMiddlePoints = null, outerMiddlePoints = null;
+
+                if (innerWallPoints.Count > 2)
+                    innerMiddlePoints =
+                        innerWallPoints
+                            .GetRange (1, innerWallPoints.Count - 2);
+
+                if (outerWallPoints.Count > 2)
+                    outerMiddlePoints =
+                        outerWallPoints
+                            .GetRange (1, outerMiddlePoints.Count - 2);
+
+                innerPoints.Add (new Tuple<Vector2?, List<Vector2>> (innerPoint, innerMiddlePoints));
+                outerPoints.Add (new Tuple<Vector2?, List<Vector2>> (outerPoint, outerMiddlePoints));
             }
 
             var inner = new Contour ();
@@ -62,34 +78,35 @@ namespace Model
             for (int count = innerPoints.Count, i = 0; i < count; i++) {
                 var nextIndex = (i + 1) % count;
                 var wall = room.Walls[i];
-                var wallLines = wall.lines;
-                var innerOpenings = new Openings ();
-                var outerOpenings = new Openings ();
+                var startWallLines = wall.StartLines;
+                var endWallLines = wall.EndLines;
+                var innerOpenings = new RoomGeometry.Openings ();
+                var outerOpenings = new RoomGeometry.Openings ();
 
-                Vector2? innerPoint = innerPoints[i];
-                Vector2? outerPoint = outerPoints[i];
+                Vector2? innerPoint = innerPoints[i].Item1;
+                Vector2? outerPoint = outerPoints[i].Item1;
                 if (innerPoint == null) {
                     var startWidth = wall.Width / 2f;
-                    innerPoint = wall.Start.TransposePoint (wallLines.InnerNormal, startWidth);
-                    outerPoint = wall.Start.TransposePoint (wallLines.OuterNormal, startWidth);
+                    innerPoint = wall.Start.TransposePoint (startWallLines.InnerNormal, startWidth);
+                    outerPoint = wall.Start.TransposePoint (startWallLines.OuterNormal, startWidth);
                 }
 
-                Vector2? nextInnerPoint = innerPoints[nextIndex];
-                Vector2? nextOuterPoint = outerPoints[nextIndex];
+                Vector2? nextInnerPoint = innerPoints[nextIndex].Item1;
+                Vector2? nextOuterPoint = outerPoints[nextIndex].Item1;
                 if (nextInnerPoint == null) {
                     var nextWall = room.Walls[nextIndex];
                     var endWidth = wall.Width / 2f;
-                    if (wall.widthChangeType == Wall.WidthChangeType.Type2)
+                    if (wall.WidthChangeType == WidthChangeType.Type2)
                         endWidth = nextWall.Width / 2f;
 
-                    nextInnerPoint = wall.End.TransposePoint (wallLines.InnerNormal, endWidth);
-                    nextOuterPoint = wall.End.TransposePoint (wallLines.OuterNormal, endWidth);
+                    nextInnerPoint = wall.End.TransposePoint (endWallLines.InnerNormal, endWidth);
+                    nextOuterPoint = wall.End.TransposePoint (endWallLines.OuterNormal, endWidth);
                 }
 
                 var actualInnerLine = Line.Create (innerPoint.Value, nextInnerPoint.Value);
                 var actualOuterLine = Line.Create (outerPoint.Value, nextOuterPoint.Value);
 
-                foreach (var opening in wall.openings) {
+                foreach (var opening in wall.Openings) {
                     OpeningContour frontContour, backContour;
                     Opening innerOpening = null, outerOpening = null;
 
@@ -101,7 +118,7 @@ namespace Model
                                         wall,
                                         x,
                                         () => actualOuterLine,
-                                        () => wallLines.OuterNormal)));
+                                        () => startWallLines.OuterNormal)));
 
                         backContour = null;
                         if (opening.OpeningType != OpeningType.Through) {
@@ -122,7 +139,7 @@ namespace Model
                                         wall,
                                         x,
                                         () => actualInnerLine,
-                                        () => wallLines.InnerNormal)));
+                                        () => startWallLines.InnerNormal)));
 
                         bool HasBackWall = opening.OpeningType != OpeningType.Through;
                         if (HasBackWall) {
@@ -165,8 +182,8 @@ namespace Model
                                             () => wallLines.OuterNormal))));*/
                 }
 
-                inner.Add (new RoomGeometry.Wall (innerPoint.Value, nextInnerPoint.Value, innerOpenings));
-                outer.Add (new RoomGeometry.Wall (outerPoint.Value, nextOuterPoint.Value, outerOpenings));
+                inner.Add (new Wall (new Points {innerPoint.Value, nextInnerPoint.Value}, innerOpenings));
+                outer.Add (new Wall (new Points {outerPoint.Value, nextOuterPoint.Value}, outerOpenings));
             }
 
             return new RoomGeometry.Geometry (inner, outer);

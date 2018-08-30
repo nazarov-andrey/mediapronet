@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Geometry
 {
@@ -7,9 +6,9 @@ namespace Geometry
     {
         public StreightLineSegment (Vector2 start, Vector2 end)
         {
-            Points = new List<Vector2> {start, end};
+            Points = new Points {start, end};
         }
 
-        public List<Vector2> Points { get; }
+        public Points Points { get; }
     }
 }

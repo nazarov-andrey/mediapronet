@@ -3,8 +3,12 @@ using UnityEngine;
 
 namespace Geometry
 {
+    public class Points : List<Vector2>
+    {
+    }
+    
     public interface ILineSegment
     {
-        List<Vector2> Points { get; }
+        Points Points { get; }
     }
 }
