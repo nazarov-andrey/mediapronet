@@ -40,9 +40,7 @@ public class Triangulation
             }            
         }
 
-        ConstraintOptions constraintOptions = new ConstraintOptions {};
-        QualityOptions qualityOptions = new QualityOptions { };
-        var mesh = poly.Triangulate (constraintOptions, qualityOptions);
+        var mesh = poly.Triangulate ();
 
         foreach (ITriangle t in mesh.Triangles) {
             for (int j = 2; j >= 0; j--) {
