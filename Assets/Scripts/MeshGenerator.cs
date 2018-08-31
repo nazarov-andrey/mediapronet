@@ -32,6 +32,7 @@ public static class MeshGenerator
         mesh.name = name ?? "";
         mesh.Clear ();
         mesh.vertices = vertices;
+        mesh.uv = new Vector2[vertices.Length];
         mesh.triangles = flipFaces
             ? triangles.Reverse ().ToArray ()
             : triangles;

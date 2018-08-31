@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Geometry;
 using JetBrains.Annotations;
@@ -11,12 +12,13 @@ namespace RoomGeometry
 {
     public static class WallGeometry
     {
-        private static List<List<Vector2>> dummyHoles = new List<List<Vector2>> ();
+        private static List<List<Vector2>> dummyHolesList = new List<List<Vector2>> ();
+        private static SystemVector2[][] dummyHolesArrray = new SystemVector2[0][];
 
         public static Mesh[] GetWallMeshes (
-            BaseWallData prevWall,
-            BaseWallData wall,
-            BaseWallData nextWall)
+            WallData prevWall,
+            WallData wall,
+            WallData nextWall)
         {
 //            var matrix = Matrix3x2.CreateRotation (sourceWall.StartAngle.Value, sourceWall.Points[0]);
 
@@ -31,26 +33,74 @@ namespace RoomGeometry
 
             Vector2 innerStart, innerEnd, outerStart, outerEnd;
 
-            Assert.IsTrue (prevLines.Inner.Cross (startLines.Inner, out innerStart));
-            Assert.IsTrue (prevLines.Outer.Cross (startLines.Outer, out outerStart));
-            Assert.IsTrue (nextLines.Inner.Cross (endLines.Inner, out innerEnd));
-            Assert.IsTrue (nextLines.Outer.Cross (endLines.Outer, out outerEnd));
-
             var innerPoints = wall.InnerPoints.Value;
             var outerPoints = wall.OuterPoints.Value;
 
+
+            if (prevLines.Inner.Cross (startLines.Inner, out innerStart)) {
+                Assert.IsTrue (prevLines.Outer.Cross (startLines.Outer, out outerStart));
+            } else {
+                innerStart = innerPoints
+                    .First ()
+                    .ToUnityVector2 ();
+
+                outerStart = outerPoints
+                    .First ()
+                    .ToUnityVector2 ();
+            }
+
+            if (nextLines.Inner.Cross (endLines.Inner, out innerEnd)) {
+                nextLines.Outer.Cross (endLines.Outer, out outerEnd);
+            } else {
+                switch (wall.WidthChangeType) {
+                    case WidthChangeType.Type1:
+                        innerEnd = innerPoints
+                            .Last ()
+                            .ToUnityVector2 ();
+
+                        outerEnd = outerPoints
+                            .Last ()
+                            .ToUnityVector2 ();
+                        break;
+                    case WidthChangeType.Type2:
+                        innerEnd = nextWall
+                            .InnerPoints
+                            .Value
+                            .First ()
+                            .ToUnityVector2 ();
+
+                        outerEnd = nextWall
+                            .OuterPoints
+                            .Value
+                            .First ()
+                            .ToUnityVector2 ();
+
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException ();
+                }
+            }
+
             var finalInnerPoints = new List<SystemVector2> ();
-            finalInnerPoints.Add (innerStart.ToSystemVector ());
+            finalInnerPoints.Add (innerStart.ToSystemVector2 ());
             finalInnerPoints.AddRange (innerPoints.Where ((_, i) => i > 0 && i < innerPoints.Length - 1));
-            finalInnerPoints.Add (innerEnd.ToSystemVector ());
+            finalInnerPoints.Add (innerEnd.ToSystemVector2 ());
 
             var finalOuterPoints = new List<SystemVector2> ();
-            finalOuterPoints.Add (outerStart.ToSystemVector ());
+            finalOuterPoints.Add (outerStart.ToSystemVector2 ());
             finalOuterPoints.AddRange (outerPoints.Where ((_, i) => i > 0 && i < outerPoints.Length - 1));
-            finalOuterPoints.Add (outerEnd.ToSystemVector ());
+            finalOuterPoints.Add (outerEnd.ToSystemVector2 ());
 
-            Mesh innerMesh = PlaneMeshMaker.GetMesh (finalInnerPoints.ToArray (), wall.Height, "inner");
-            Mesh outerMesh = PlaneMeshMaker.GetMesh (finalOuterPoints.ToArray (), wall.Height, "outer");
+            Mesh innerMesh = PlaneMeshMaker.GetMesh (
+                finalInnerPoints.ToArray (),
+                dummyHolesArrray,
+                wall.Height,
+                "inner");
+            Mesh outerMesh = PlaneMeshMaker.GetMesh (
+                finalOuterPoints.ToArray (),
+                dummyHolesArrray,
+                wall.Height,
+                "outer");
             outerMesh.FlipFaces ();
 
             float height = wall.Height;
@@ -76,7 +126,7 @@ namespace RoomGeometry
             List<int> triangles;
             MeshGenerator.Triangulate (
                 topVertices.ConvertAll (x => x.ToUnityVector2 ()),
-                dummyHoles,
+                dummyHolesList,
                 false,
                 out vertices,
                 out triangles);

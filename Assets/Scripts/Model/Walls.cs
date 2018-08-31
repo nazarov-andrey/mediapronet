@@ -13,7 +13,7 @@ namespace Model
         public readonly SystemVector2 Inner;
         public readonly SystemVector2 Outer;
 
-        public WallPointNormals (Vector2 inner) : this (inner.ToSystemVector ())
+        public WallPointNormals (Vector2 inner) : this (inner.ToSystemVector2 ())
         {
         }
 
@@ -41,23 +41,45 @@ namespace Model
         }
     }
 
-    public class BaseWallData
+    public class OpeningData
+    {
+        public readonly OpeningType Type;
+        public readonly SystemVector2[] Points;
+
+        public OpeningData (OpeningType type, SystemVector2[] points)
+        {
+            Type = type;
+            Points = points;
+        }
+    }
+
+    public class WallData
     {
         public readonly SystemVector2[] Points;
+        public readonly float Width;
+        public readonly float Height;
+        public readonly OpeningData[] Openings;
+        public readonly WidthChangeType WidthChangeType;
+
         public readonly Lazy<SystemVector2[]> InnerPoints;
         public readonly Lazy<SystemVector2[]> OuterPoints;
         public readonly Lazy<float> StartAngle;
         public readonly Lazy<float> EndAngle;
         public readonly Lazy<WallPointNormals[]> Normals;
         public readonly Lazy<WallSegmentLines[]> Lines;
-        public readonly float Width;
-        public readonly float Height;
 
-        public BaseWallData (SystemVector2[] points, float width, float height)
+        public WallData (
+            SystemVector2[] points,
+            float width,
+            float height,
+            OpeningData[] openings,
+            WidthChangeType widthChangeType)
         {
             Points = points;
             Width = width;
             Height = height;
+            Openings = openings;
+            WidthChangeType = widthChangeType;
 
             StartAngle = new Lazy<float> (GetStartAngle);
             EndAngle = new Lazy<float> (GetEndAngle);
@@ -100,7 +122,6 @@ namespace Model
                     Line.Create (outerPoints[i + 1], outerPoints[i]));
             }
 
-            Debug.Log($"GetLines {lines.Length}");
             return lines;
         }
 
@@ -134,35 +155,52 @@ namespace Model
             return Mathf.Atan2 (-endLine.A, endLine.B);
         }
 
-        public BaseWallData Transform (Matrix3x2 matrix)
+        public WallData Transform (Matrix3x2 matrix)
         {
-            return new BaseWallData (
+            return new WallData (
                 Array.ConvertAll (Points, x => SystemVector2.Transform (x, matrix)),
                 Width,
-                Height);
+                Height,
+                Openings,
+                WidthChangeType);
         }
 
-        public static BaseWallData CreateStreight (Vector2 start, Vector2 end, float width, float height)
+        public static WallData CreateStreight (
+            Vector2 start,
+            Vector2 end,
+            float width,
+            float height,
+            OpeningData[] openings = null,
+            WidthChangeType widthChangeType = WidthChangeType.Type1)
         {
-            return new BaseWallData (new[] {start.ToSystemVector (), end.ToSystemVector ()}, width, height);
+            return new WallData (
+                new[] {start.ToSystemVector2 (), end.ToSystemVector2 ()},
+                width,
+                height,
+                openings,
+                widthChangeType);
         }
 
-        public static BaseWallData CreateCurved (
+        public static WallData CreateCurved (
             Vector2 p0,
             Vector2 p1,
             Vector2 p2,
             float width,
             float height,
+            OpeningData[] openings = null,
+            WidthChangeType widthChangeType = WidthChangeType.Type1,
             int quality = 15)
         {
             var bezierSegment = new QuadraticBezierSegment (p0, p1, p2, quality);
-            return new BaseWallData (
+            return new WallData (
                 bezierSegment
                     .Points
-                    .ConvertAll (x => x.ToSystemVector ())
+                    .ConvertAll (x => x.ToSystemVector2 ())
                     .ToArray (),
                 width,
-                height);
+                height,
+                openings,
+                widthChangeType);
         }
     }
 

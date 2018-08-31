@@ -1,5 +1,5 @@
 ﻿using UnityEngine;
-using SystemVector = System.Numerics.Vector2;
+using SystemVector2 = System.Numerics.Vector2;
 
 namespace Geometry
 {
@@ -15,9 +15,9 @@ namespace Geometry
             return point + direction.normalized * distance;
         }
 
-        public static SystemVector ToSystemVector (this Vector2 vector)
+        public static SystemVector2 ToSystemVector2 (this Vector2 vector)
         {
-            return new SystemVector (vector.x, vector.y);
+            return new SystemVector2 (vector.x, vector.y);
         }
 
         public static Vector3 ToVector3 (this Vector2 vector, float z = 0f)

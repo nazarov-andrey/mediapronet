@@ -4,8 +4,8 @@ using System.Linq;
 using System.Numerics;
 using Geometry;
 using UnityEngine;
-using UnityEngine.Assertions;
 using SystemVector2 = System.Numerics.Vector2;
+using SystemVector3 = System.Numerics.Vector3;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
@@ -13,12 +13,54 @@ namespace RoomGeometry
 {
     public static class PlaneMeshMaker
     {
-        private static bool logEnabled = false;
-
-        private static void Log (string message)
+        class HoleData
         {
-            if (logEnabled)
-                Debug.Log (message);
+            public readonly List<Vector2> Hole;
+            public float Min;
+            public float Max;
+
+            public HoleData (List<Vector2> hole, float min, float max)
+            {
+                Hole = hole;
+                Min = min;
+                Max = max;
+            }
+        }
+
+        enum PointType
+        {
+            Regular,
+            PointStart,
+            PointEnd
+        }
+
+        class Point
+        {
+            public class Comparer : IComparer<Point>
+            {
+                public int Compare (Point x, Point y)
+                {
+                    return Comparer<float>.Default.Compare (x.X, y.X);
+                }
+            }
+
+            public PointType PointType;
+            public readonly float X;
+
+            public Point (PointType pointType, float x)
+            {
+                PointType = pointType;
+                X = x;
+            }
+        }
+
+        private static HoleData GetHoleData (List<Vector2> hole)
+        {
+            var sorted = hole
+                .OrderBy (x => x.x)
+                .ToArray ();
+
+            return new HoleData (hole, sorted.First ().x, sorted.Last ().x);
         }
 
         public static Mesh GetMesh (Vector3 a, Vector3 b, Vector3 c, Vector3 d, string name = null)
@@ -29,66 +71,130 @@ namespace RoomGeometry
             return MeshGenerator.CreateMesh (vertices, trianles, false, name);
         }
 
-        public static Mesh GetMesh (SystemVector2[] points, float height, string name = null)
+        private static Mesh Triangulate (
+            List<Vector2> sourceVertices,
+            List<List<Vector2>> holes,
+            UnwrappedCurve unwrappedCurve,
+            string name = null)
         {
-            var matrix = Matrix3x2.CreateTranslation (-points[0]);
-            var matrices = new List<Matrix3x2> ();
-            var unwrappedPoints = new List<SystemVector2> ();
-            for (int count = points.Length, i = 0; i < count; i++) {
-                var originalPoint = points[i];
-                var point = SystemVector2.Transform (originalPoint, matrix);
-                Matrix3x2 inveseMatrix;
-                Assert.IsTrue (Matrix3x2.Invert (matrix, out inveseMatrix));
-                matrices.Add (inveseMatrix);
-                Log (
-                    $"adding unwrapped point originalPoint {originalPoint} point {point} points {string.Join (",", Array.ConvertAll (points, x => SystemVector2.Transform (x, matrix)).ToArray ())}");
-                unwrappedPoints.Add (point);
-
-                if (i < count - 1) {
-                    var originalNextPoint = points[i + 1];
-                    var nextPoint = SystemVector2.Transform (originalNextPoint, matrix);
-                    var line = Line.Create (point, nextPoint);
-                    Log (
-                        $"line nextPoint: {nextPoint} originalNextPoint: {originalNextPoint} originalPoint: {originalPoint} point: {point} {line}");
-                    var angle = -Mathf.Atan2 (-line.A, line.B);
-
-                    Log ($"angle {angle * Mathf.Rad2Deg}");
-
-                    matrix *= Matrix3x2.CreateRotation (angle, point);
-                }
-            }
-
-            Log (
-                $"unwrappedPoints {string.Join (",", unwrappedPoints.ConvertAll (x => x.ToString ()).ToArray ())}");
-
-            var sourceVertices = unwrappedPoints.ConvertAll (x => x.ToUnityVector2 ());
-            sourceVertices.AddRange (
-                unwrappedPoints
-                    .Select (x => x.ToUnityVector2 () + new Vector2 (0f, height))
-                    .Reverse ()
-                    .ToList ());
-
             List<int> trianles;
             List<Vector3> vertices;
 
             MeshGenerator.Triangulate (
                 sourceVertices,
-                new List<List<Vector2>> (),
+                holes,
                 false,
                 out vertices,
                 out trianles);
 
             for (int count = vertices.Count, i = 0; i < count; i++) {
                 var vertex = vertices[i];
-                var point = new SystemVector2 (vertex.x, vertex.y);
-                var index = unwrappedPoints.FindIndex (x => Mathf.Approximately (x.X, point.X));
-                matrix = matrices[index];
-                point = SystemVector2.Transform (point, matrix);
-
+                var point = unwrappedCurve.WrapBack (new SystemVector2 (vertex.x, vertex.y));
                 vertices[i] = new Vector3 (point.X, vertex.z, point.Y);
             }
 
             return MeshGenerator.CreateMesh (vertices.ToArray (), trianles.ToArray (), false, name);
+        }
+
+        public static Mesh GetMesh (
+            SystemVector2[] contour,
+            SystemVector2[][] normalizedHoles,
+            float height,
+            string name = null)
+        {
+            var unwrappedCurve = new UnwrappedCurve (contour, Matrix3x2.CreateTranslation (-contour[0]));
+            var unwrappedPoints = unwrappedCurve.UnwrappedPoints.ToList ();
+            var sourceVerticesBottomLine = unwrappedPoints.ConvertAll (x => x.ToUnityVector2 ());
+            var width = unwrappedPoints.Last ().X;
+            var holes = normalizedHoles
+                ?.Select (x => x.Select (y => new Vector2 (width * y.X, height * y.Y)).ToList ())
+                .ToList ();
+
+            if (holes == null) {
+                var sourceVerticesTopLine = sourceVerticesBottomLine
+                    .Select (x => x + new Vector2 (0f, height))
+                    .Reverse ()
+                    .ToList ();
+
+                var sourceVertices = new List<Vector2> (sourceVerticesBottomLine);
+                sourceVertices.AddRange (sourceVerticesTopLine);
+
+                return Triangulate (sourceVertices, null, unwrappedCurve);
+            }
+
+            var sortedHoles = holes
+                .Select (GetHoleData)
+                .OrderBy (x => x.Min)
+                .ToArray ();
+            var xs = new List<Point> (
+                sourceVerticesBottomLine.ConvertAll (x => new Point (PointType.Regular, x.x)));
+
+            foreach (var hole in sortedHoles) {
+                var minIndex = xs.FindIndex (x => Mathf.Approximately (x.X, hole.Min));
+                if (minIndex >= 0)
+                    xs[minIndex].PointType = PointType.PointStart;
+                else
+                    xs.Add (new Point (PointType.PointStart, hole.Min));
+
+                var maxIndex = xs.FindIndex (x => Mathf.Approximately (x.X, hole.Max));
+                if (maxIndex >= 0)
+                    xs[maxIndex].PointType = PointType.PointEnd;
+                else
+                    xs.Add (new Point (PointType.PointEnd, hole.Max));
+            }
+
+            xs.Sort ((x, y) => Comparer<float>.Default.Compare (x.X, y.X));
+            var chunks = new List<List<float>> {new List<float> ()};
+            var startedCount = 0;
+            foreach (var x in xs) {
+                chunks
+                    .Last ()
+                    .Add (x.X);
+                switch (x.PointType) {
+                    case PointType.Regular:
+                        break;
+                    case PointType.PointStart:
+                        if (++startedCount == 1)
+                            chunks.Add (new List<float> {x.X});
+                        break;
+                    case PointType.PointEnd:
+                        if (--startedCount == 0)
+                            chunks.Add (new List<float> {x.X});
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException ();
+                }
+            }
+
+            var meshes = new List<Mesh> ();
+            foreach (var chunk in chunks) {
+                var chunkBottomLine = new List<Vector2> (chunk.ConvertAll (x => new Vector2 (x, 0f)));
+                var chunkHoles = new List<List<Vector2>> ();
+                foreach (var x in chunk) {
+                    var holesData = Array.FindAll (sortedHoles, y => Mathf.Approximately (x, y.Min));
+                    if (holesData.Length > 0 && !Mathf.Approximately (x, chunk.Last ()))
+                        chunkHoles.AddRange (holesData.Select (y => y.Hole));
+                }
+
+                var chunkTopLine = chunkBottomLine
+                    .Select (x => new Vector2 (x.x, height))
+                    .Reverse ()
+                    .ToArray ();
+                var chunkVertices = new List<Vector2> (chunkBottomLine);
+                chunkVertices.AddRange (chunkTopLine);
+
+                var chunkMesh = Triangulate (chunkVertices, chunkHoles, unwrappedCurve);
+                meshes.Add (chunkMesh);
+            }
+
+            var mesh = new Mesh ();
+            mesh.Clear ();
+            mesh.CombineMeshes (
+                meshes.ConvertAll (x => new CombineInstance {mesh = x}).ToArray (),
+                true,
+                false);
+
+            return mesh;
         }
     }
 }

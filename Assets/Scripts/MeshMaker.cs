@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Geometry;
 using Model;
+using Parabox.CSG;
 using RoomGeometry;
 using UnityEngine;
 using Openings = Model.Openings;
@@ -374,30 +376,86 @@ public class MeshMaker : MonoBehaviour
     private void Start ()
     {
         var bezierSegment = new QuadraticBezierSegment (
-            new Vector2 (-1f, 0f),
-            new Vector2 (-2f, 1f),
-            new Vector2 (-1f, 2f),
+            new Vector2 (0f, 0f),
+            new Vector2 (1.5f, -1f),
+            new Vector2 (3f, 0f),
             50);
+
+
+/*        var walls = new[]
+        {
+//            BaseWallData.CreateStreight (new Vector2 (-2, -2), new Vector2 (-2, 2), 0.2f, 2f),
+            WallData.CreateCurved (new Vector2 (-2, -2), new Vector2 (-4, -0), new Vector2 (-2, 2), 0.3f, 2f),
+            WallData.CreateStreight (new Vector2 (-2, 2), new Vector2 (0, 2), 0.4f, 2f, WidthChangeType.Type2),
+            WallData.CreateStreight (new Vector2 (0, 2), new Vector2 (2, 2), 0.1f, 2f),
+            WallData.CreateStreight (new Vector2 (2, 2), new Vector2 (2, -2), 0.2f, 2f),
+            WallData.CreateStreight (new Vector2 (2, -2), new Vector2 (-2, -2), 0.5f, 2f)
+        };*/
 
         var walls = new[]
         {
-//            BaseWallData.CreateStreight (new Vector2 (-2, -2), new Vector2 (-2, 2), 0.2f, 2f),
-            BaseWallData.CreateCurved (new Vector2 (-2, -2), new Vector2 (-4, -0), new Vector2 (-2, 2), 0.2f, 2f),
-            BaseWallData.CreateStreight (new Vector2 (-2, 2), new Vector2 (2, 2), 0.2f, 2f),
-            BaseWallData.CreateStreight (new Vector2 (2, 2), new Vector2 (2, -2), 0.2f, 2f),
-            BaseWallData.CreateStreight (new Vector2 (2, -2), new Vector2 (-2, -2), 0.2f, 2f)
+            WallData.CreateStreight (new Vector2 (0, -2), new Vector2 (-2, 0), 0.2f, 2f),
+            WallData.CreateStreight (new Vector2 (-2, 0), new Vector2 (0, 2), 0.2f, 2f),
+            WallData.CreateStreight (new Vector2 (0, 2), new Vector2 (2, 0), 0.2f, 2f),
+            WallData.CreateStreight (new Vector2 (2, 0), new Vector2 (0, -2), 0.2f, 2f)
         };
-        
-/*        var walls = new[]
-        {
-            BaseWallData.CreateStreight (new Vector2 (0, -2), new Vector2 (-2, 0), 0.2f, 2f),
-            BaseWallData.CreateStreight (new Vector2 (-2, 0), new Vector2 (0, 2), 0.2f, 2f),
-            BaseWallData.CreateStreight (new Vector2 (0, 2), new Vector2 (2, 0), 0.2f, 2f),
-            BaseWallData.CreateStreight (new Vector2 (2, 0), new Vector2 (0, -2), 0.2f, 2f)
-        };*/
+
+        var qqq = new QuadraticBezierSegment (
+            new Vector2 (0.1f, 0.25f),
+            new Vector2 (0.3f, 0.0f),
+            new Vector2 (0.5f, 0.25f),
+            Mathf.RoundToInt (50 * 0.4f));
+
+        var qqq1 = new QuadraticBezierSegment (
+            new Vector2 (0.1f, 0.6f),
+            new Vector2 (0.3f, 0.35f),
+            new Vector2 (0.5f, 0.6f),
+            Mathf.RoundToInt (50 * 0.4f));
+
+        var opening1 = new List<Vector2> (qqq.Points);
+        opening1.AddRange (opening1.ToArray ().Reverse ().Select (x => new Vector2 (x.x, x.y + 0.2f)));
+
+        var opening2 = new List<Vector2> (qqq1.Points);
+        opening2.AddRange (opening2.ToArray ().Reverse ().Select (x => new Vector2 (x.x, x.y + 0.2f)));
+/*        var opening = new List<Vector2> ();
+        var minX = 0f;
+        var maxX = 0.5f;
+        var minY = 0.35f;
+        var maxY = 0.4f;
+        var q = Mathf.RoundToInt (50 * (maxX - minX));
+        for (int i = 0; i < q; i++) {
+            var f = (float) i / (q - 1);
+            opening.Add (new Vector2 (f * (maxX - minX) + minX, f * (maxY - minY) + minY));
+        }*/
 
 
-        var wallsCount = walls.Length;
+        var mesh = PlaneMeshMaker.GetMesh (
+            bezierSegment.Points.ConvertAll (x => x.ToSystemVector2 ()).ToArray (),
+//            new SystemVector2[0][],
+            new[]
+            {
+                opening1.ConvertAll (x => x.ToSystemVector2 ()).ToArray (),
+                opening2.ConvertAll (x => x.ToSystemVector2 ()).ToArray (),
+
+//                opening.ConvertAll (x => new SystemVector2 (x.x + 0.3f, x.y)).ToArray ()
+/*                new[]
+                {
+                    new SystemVector2 (0.5f, 0.5f), new SystemVector2 (0.5f, 1.25f), new SystemVector2 (1.25f, 1.25f),
+                    new SystemVector2 (1.25f, 0.5f)
+                },
+
+                new[]
+                {
+                    new SystemVector2 (1.5f, 0.5f), new SystemVector2 (1.5f, 1.25f), new SystemVector2 (2.25f, 1.25f),
+                    new SystemVector2 (2.25f, 0.5f)
+                }*/
+            },
+            2f);
+
+        MeshGenerator.CreateGameObject ("qqq", mesh);
+
+
+/*        var wallsCount = walls.Length;
         for (int i = 0; i < wallsCount; i++) {
             var prevIndex = (i - 1 + wallsCount) % wallsCount;
             var nextIndex = (i + 1) % wallsCount;
@@ -411,7 +469,7 @@ public class MeshMaker : MonoBehaviour
                     .transform
                     .SetParent (parent, false);
             }
-        }
+        }*/
 
 
 /*        MeshGenerator.CreateGameObject (
@@ -513,9 +571,9 @@ public class MeshMaker : MonoBehaviour
 
     private void OnValidate ()
     {
-        if (!Application.isPlaying)
+/*        if (!Application.isPlaying)
             return;
 
-        StartCoroutine (LateRebuild ());
+        StartCoroutine (LateRebuild ());*/
     }
 }
