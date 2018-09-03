@@ -67,7 +67,7 @@ namespace RoomGeometry
             WallData wall,
             UnwrappedCurve unwrappedWall,
             UnwrappedCurve unwrappedWallSide,
-            Func<WallPointNormals, Vector2> normalsGetter)
+            Func<WallPointNormals, Vector2> normalGetter)
         {
 /*            Debug.Log (
                 $"unwrappedWall {string.Join (",", Array.ConvertAll (unwrappedWall.UnwrappedPoints, x => x.ToString ()))}");
@@ -81,8 +81,8 @@ namespace RoomGeometry
                     continue;
 
                 var normals = wall.Normals.Value;
-                var normal = normalsGetter (normals[i]);
-                var prevNormal = normalsGetter (normals[i - 1]);
+                var normal = normalGetter (normals[i]);
+                var prevNormal = normalGetter (normals[i - 1]);
                 var averageNormal = normal + prevNormal;
                 var unwrapped = unwrappedWall
                     .Unwrap (new Vector2 (openingPoint.x, 0f))
@@ -196,17 +196,53 @@ namespace RoomGeometry
             return jambMeshes;
         }
 
+        private static Hole2DProjection[] OpeningsToHole2DProjections (
+            WallData wall,
+            UnwrappedCurve mainCurve,
+            UnwrappedCurve sideCurve,
+            Func<OpeningData, bool> predicate,
+            Func<WallPointNormals, Vector2> normalGetter)
+        {
+            return wall
+                .Openings
+                ?.Where (predicate)
+                .Select (
+                    x => new Hole2DProjection (
+                        x
+                            .Points
+                            .Select (
+                                y => ProjectOpeningPoint (
+                                    y,
+                                    wall,
+                                    mainCurve,
+                                    sideCurve,
+                                    normalGetter))
+                            .ToArray (),
+                        x))
+                .ToArray ();
+        }
+
+        private static Hole3DProjection[] Hole2DProjectionsTo3D (
+            Hole2DProjection[] projections2D,
+            UnwrappedCurve curve)
+        {
+            return projections2D
+                ?.Select (
+                    x => new Hole3DProjection (
+                        x
+                            .Points
+                            .Select (y => GetHole3DPoint (curve, y))
+                            .ToArray (),
+                        x.Opening
+                    ))
+                .ToArray ();
+        }
+
         public static Mesh[] GetWallMeshes (
             WallData prevWall,
             WallData wall,
             WallData nextWall)
         {
-//            var matrix = Matrix3x2.CreateRotation (sourceWall.StartAngle.Value, sourceWall.Points[0]);
-
-/*            var prevWall = sourcePrevWall.Transform (matrix);
-            var wall = sourceNextWall.Transform (matrix);
-            var nextWall = sourceNextWall.Transform (matrix);*/
-
             var prevLines = prevWall.Lines.Value.Last ();
             var startLines = wall.Lines.Value.First ();
             var endLines = wall.Lines.Value.Last ();
@@ -216,7 +252,6 @@ namespace RoomGeometry
 
             var innerPoints = wall.InnerPoints.Value;
             var outerPoints = wall.OuterPoints.Value;
-
 
             if (prevLines.Inner.Cross (startLines.Inner, out innerStart)) {
                 Assert.IsTrue (prevLines.Outer.Cross (startLines.Outer, out outerStart));
@@ -266,62 +301,24 @@ namespace RoomGeometry
             var outerUnwrappedWall = new UnwrappedCurve (finalOuterPoints);
             var innerUnwrappedWall = new UnwrappedCurve (finalInnerPoints);
 
-            var outer2DHoles = wall
-                .Openings
-                ?.Where (x => x.Type.HasFlag (OpeningType.Outer))
-                .Select (
-                    x => new Hole2DProjection (
-                        x
-                            .Points
-                            .Select (
-                                y => ProjectOpeningPoint (
-                                    y,
-                                    wall,
-                                    unwrappedWall,
-                                    outerUnwrappedWall,
-                                    z => z.Outer))
-                            .ToArray (),
-                        x))
-                .ToArray ();
+            var outer2DHoles =
+                OpeningsToHole2DProjections (
+                    wall,
+                    unwrappedWall,
+                    outerUnwrappedWall,
+                    x => x.Type.HasFlag (OpeningType.Outer),
+                    x => x.Outer);
 
-            var inner2DHoles = wall
-                .Openings
-                ?.Where (x => x.Type.HasFlag (OpeningType.Inner))
-                .Select (
-                    x => new Hole2DProjection (
-                        x
-                            .Points
-                            .Select (
-                                y => ProjectOpeningPoint (
-                                    y,
-                                    wall,
-                                    unwrappedWall,
-                                    innerUnwrappedWall,
-                                    z => z.Inner))
-                            .ToArray (),
-                        x))
-                .ToArray ();
+            var inner2DHoles =
+                OpeningsToHole2DProjections (
+                    wall,
+                    unwrappedWall,
+                    innerUnwrappedWall,
+                    x => x.Type.HasFlag (OpeningType.Inner),
+                    x => x.Inner);
 
-            var outer3DHoles = outer2DHoles
-                ?.Select (
-                    x => new Hole3DProjection (
-                        x
-                            .Points
-                            .Select (y => GetHole3DPoint (outerUnwrappedWall, y))
-                            .ToArray (),
-                        x.Opening
-                    ))
-                .ToArray ();
-
-            var inner3DHoles = inner2DHoles
-                ?.Select (
-                    x => new Hole3DProjection (
-                        x
-                            .Points
-                            .Select (y => GetHole3DPoint (innerUnwrappedWall, y))
-                            .ToArray (),
-                        x.Opening))
-                .ToArray ();
+            var outer3DHoles = Hole2DProjectionsTo3D (outer2DHoles, outerUnwrappedWall);
+            var inner3DHoles = Hole2DProjectionsTo3D (inner2DHoles, innerUnwrappedWall);
 
             List<Mesh> jambMeshes = null;
             if (outer3DHoles != null) {
@@ -398,21 +395,6 @@ namespace RoomGeometry
                 result.AddRange (jambMeshes);
 
             return result.ToArray ();
-        }
-    }
-
-    public class OpeningContour : List<Vector3>
-    {
-        public OpeningContour ()
-        {
-        }
-
-        public OpeningContour ([NotNull] IEnumerable<Vector3> collection) : base (collection)
-        {
-        }
-
-        public OpeningContour (int capacity) : base (capacity)
-        {
         }
     }
 }
