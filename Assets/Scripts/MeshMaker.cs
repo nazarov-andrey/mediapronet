@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
+using System.Numerics;
 using Geometry;
 using Model;
 using RoomGeometry;
 using UnityEngine;
-using Openings = Model.Openings;
 using SystemVector2 = System.Numerics.Vector2;
+using Vector2 = UnityEngine.Vector2;
 
 public class MeshMaker : MonoBehaviour
 {
@@ -72,7 +72,7 @@ public class MeshMaker : MonoBehaviour
             flipFaces);
     }*/
 
-    private Vector2 AbsoluteOpeningVertexToRelative (Vector2 origin, Vector3 vertex)
+/*    private Vector2 AbsoluteOpeningVertexToRelative (Vector2 origin, Vector3 vertex)
     {
         return new Vector2 ((new Vector2 (vertex.x, vertex.y) - origin).magnitude, vertex.z);
     }
@@ -80,9 +80,9 @@ public class MeshMaker : MonoBehaviour
     private Vector3 FlipYZ (Vector3 v)
     {
         return new Vector3 (v.x, v.z, v.y);
-    }
+    }*/
 
-    private void ProcessContour (string name, Contour contour, bool flipFaces)
+/*    private void ProcessContour (string name, Contour contour, bool flipFaces)
     {
         foreach (var wall in contour) {
             var wallSize = wall.Size;
@@ -129,7 +129,7 @@ public class MeshMaker : MonoBehaviour
                         Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (-90f, -backWallAngle, 0f), Vector3.one);
 
 /*                    var a = backConoutour
-                        .ConvertAll (x => inverseOpeningMatrix.MultiplyPoint (x));*/
+                        .ConvertAll (x => inverseOpeningMatrix.MultiplyPoint (x));#1#
 
                     var backContourVertexes = backConoutour
                         .ConvertAll (x => inverseOpeningMatrix.MultiplyPoint (x))
@@ -138,7 +138,7 @@ public class MeshMaker : MonoBehaviour
 /*                    for (int count = backConoutour.Count, i = 0; i < count; i++) {
                         Debug.DrawLine (backConoutour[i], backConoutour[(i + 1) % count], Color.red, float.MaxValue);
                         Debug.DrawLine (a[i], a[(i + 1) % count], Color.green, float.MaxValue);
-                    }*/
+                    }#1#
 
                     var jambBackWall = MeshGenerator.CreateGameObject (
                         "jamb back wall",
@@ -180,12 +180,12 @@ public class MeshMaker : MonoBehaviour
             var go = MeshGenerator.CreateGameObject (name, vertices, holes, flipFaces, true, matrix);
             gos.Add (go);
         }
-    }
+    }*/
 
-    private Room room;
-    private List<GameObject> gos = new List<GameObject> ();
+/*    private Room room;
+    private List<GameObject> gos = new List<GameObject> ();*/
 
-    private void CreateRoom ()
+/*    private void CreateRoom ()
     {
 /*        room = new Room (
             new StreightWall (
@@ -348,7 +348,7 @@ public class MeshMaker : MonoBehaviour
                         0.1f,
                         new Vector2 (1f, 0f),
                         new Vector2 (1f, 1.75f))
-                }));*/
+                }));#1#
 
         room = new Room (
             new CurvedWall (
@@ -369,11 +369,11 @@ public class MeshMaker : MonoBehaviour
                 {
                     new SquareOpening (OpeningType.Outer, 0.1f, new Vector2 (0.5f, 0f), new Vector2 (1f, 1.75f))
                 }));
-    }
+    }*/
 
     private Vector2[] CreateBezierHoleShape ()
     {
-        var q = 20;
+        var q = 10;
         var s1 = new QuadraticBezierSegment (0.5f, 0.25f, 0.25f, 0.625f, 0.5f, 1f, q);
         var s2 = new QuadraticBezierSegment (0.5f, 1f, 0.625f, 1.25f, 0.5f, 1.5f, q);
         var s3 = new QuadraticBezierSegment (0.5f, 1.5f, 0.875f, 1.375f, 1f, 1f, q);
@@ -392,7 +392,7 @@ public class MeshMaker : MonoBehaviour
     private Vector2[] CreateRectHoleShape ()
     {
         return new[]
-            {new Vector2 (0.5f, 0.25f), new Vector2 (0.5f, 1.5f), new Vector2 (1f, 1.5f), new Vector2 (1f, 0.25f)};
+            {new Vector2 (1.5f, 0.25f), new Vector2 (1.5f, 1.5f), new Vector2 (2f, 1.5f), new Vector2 (2f, 0.25f)};
     }
 
     private void PlaneGenerationTest ()
@@ -400,7 +400,6 @@ public class MeshMaker : MonoBehaviour
         var q = 50;
         var countourSegment = new QuadraticBezierSegment (
             new Vector2 (4f, 1f),
-            
             new Vector2 (2.5f, 0f),
             new Vector2 (1f, 1f),
             q);
@@ -455,24 +454,41 @@ public class MeshMaker : MonoBehaviour
         MeshGenerator.CreateGameObject ("qqq", mesh);
     }
 
-    private void SingleWallTest ()
+    private void StreightAndCurvedWallsTest ()
     {
         var nextWall = WallData.CreateStreight (new Vector2 (0f, 0f), new Vector2 (0f, 2f), 0.2f, 2f);
         var prevWall = WallData.CreateStreight (new Vector2 (3f, 2f), new Vector2 (3f, 0f), 0.1f, 2f);
-/*        var wall = WallData.CreateStreight (
-            new Vector2 (3f, 0f),
-            new Vector2 (0f, 0f),
-            0.3f,
-            2f,
-            new[] {new OpeningData (OpeningType.Through, CreateRectHoleShape ())});*/
-        var wall = WallData.CreateCurved (
-            new Vector2 (3f, 0f),
-            new Vector2 (1.5f, -1f),
-            new Vector2 (0f, 0f),
-            0.3f,
-            2f,
-            new[] {new OpeningData (OpeningType.Through, CreateBezierHoleShape ())});
 
+        var curvedWall = WallData.CreateCurved (
+            new Vector2 (3f, 0f),
+            new Vector2 (1.5f, -1.5f),
+            new Vector2 (0f, 0f),
+            0.15f,
+            2f,
+            new[]
+            {
+                new OpeningData (OpeningType.Through, CreateBezierHoleShape ()),
+                new OpeningData (OpeningType.Through, CreateRectHoleShape ())
+            });
+
+        var matrix = Matrix3x2.CreateTranslation (0f, 3f);
+        var streightWall = WallData.CreateStreight (
+            new Vector2 (3f, 0f),
+            new Vector2 (0f, 0f),
+            0.3f,
+            2f,
+            new[]
+            {
+                new OpeningData (OpeningType.Through, CreateBezierHoleShape ()),
+                new OpeningData (OpeningType.Through, CreateRectHoleShape ())
+            });
+
+        SingleWallTest (curvedWall, nextWall, prevWall);
+        SingleWallTest (streightWall.Transform (matrix), nextWall.Transform (matrix), prevWall.Transform (matrix));
+    }
+
+    private void SingleWallTest (WallData wall, WallData nextWall, WallData prevWall)
+    {
         var meshes = WallGeometry.GetWallMeshes (prevWall, wall, nextWall);
         var parent = new GameObject ("Wall").transform;
         foreach (var mesh in meshes) {
@@ -524,15 +540,13 @@ public class MeshMaker : MonoBehaviour
     {
 //        PlaneGenerationTest ();
 //        WallsTest ();
-        SingleWallTest ();
+        StreightAndCurvedWallsTest ();
 
-        return;
-
-        CreateRoom ();
-        BuildMesh ();
+//        CreateRoom ();
+//        BuildMesh ();
     }
 
-    private void CreateWallJamb (
+/*    private void CreateWallJamb (
         Wall innerWall,
         Wall outerWall,
         Func<Wall, Vector2> endGetter,
@@ -553,9 +567,9 @@ public class MeshMaker : MonoBehaviour
         var go = MeshGenerator.CreateGameObject ("wall jamb", vertices, triangles, flipFaces);
 
         gos.Add (go);
-    }
+    }*/
 
-    private void BuildMesh ()
+/*    private void BuildMesh ()
     {
         if (room == null)
             return;
@@ -610,13 +624,13 @@ public class MeshMaker : MonoBehaviour
 
         gos.Add (topMesh);
         gos.Add (floorMesh);
-    }
+    }*/
 
     private IEnumerator LateRebuild ()
     {
         yield return null;
-        CreateRoom ();
-        BuildMesh ();
+//        CreateRoom ();
+//        BuildMesh ();
     }
 
     private void OnValidate ()

@@ -91,7 +91,7 @@ namespace RoomGeometry
 
             for (int count = vertices.Count, i = 0; i < count; i++) {
                 var vertex = vertices[i];
-                var point = unwrappedCurve.WrapBack (new SystemVector2 (vertex.x, vertex.y));
+                var point = unwrappedCurve.Unwrap (new SystemVector2 (vertex.x, vertex.y));
                 vertices[i] = new Vector3 (point.X, vertex.z, point.Y);
             }
 

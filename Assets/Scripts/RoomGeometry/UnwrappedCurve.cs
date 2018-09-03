@@ -82,7 +82,7 @@ namespace RoomGeometry
             var matrix = Matrices[index];
             var result = SystemVector2.Transform (point, matrix);
             
-            Debug.Log ($"--->>>Wrap {point} index {index} matrix {matrix} result {result}");
+//            Debug.Log ($"--->>>Wrap {point} index {index} matrix {matrix} result {result}");
 
             return result;
         }
@@ -92,12 +92,12 @@ namespace RoomGeometry
             return Wrap (point.ToSystemVector2 ()).ToUnityVector2 ();
         }
 
-        public SystemVector2 WrapBack (Vector2 point)
+        public SystemVector2 Unwrap (Vector2 point)
         {
-            return WrapBack (point.ToSystemVector2 ());
+            return Unwrap (point.ToSystemVector2 ());
         }
 
-        public SystemVector2 WrapBack (SystemVector2 point)
+        public SystemVector2 Unwrap (SystemVector2 point)
         {
             var index = FindNearestPointIndex (UnwrappedPoints, point);
             var matrix = InverseMatrices[index];

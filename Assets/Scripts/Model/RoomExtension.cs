@@ -1,15 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using Geometry;
-using RoomGeometry;
-using UnityEngine;
-using UnityEngine.Assertions;
-
-namespace Model
+﻿namespace Model
 {
     public static class RoomExtension
     {
-        private static Vector3 RelativeOpeningToAbsolute (
+/*        private static Vector3 RelativeOpeningToAbsolute (
             IWall wall,
             Vector2 relative,
             Func<Line> lineGetter,
@@ -20,9 +13,9 @@ namespace Model
             absolute.z = relative.y;
 
             return absolute;
-        }
+        }*/
 
-        public static RoomGeometry.Geometry GenerateGeometry (this Room room)
+/*        public static RoomGeometry.Geometry GenerateGeometry (this Room room)
         {
             var innerPoints = new List<Tuple<Vector2?, List<Vector2>>> ();
             var outerPoints = new List<Tuple<Vector2?, List<Vector2>>> ();
@@ -179,7 +172,7 @@ namespace Model
                                             wall,
                                             x,
                                             () => actualOuterLine,
-                                            () => wallLines.OuterNormal))));*/
+                                            () => wallLines.OuterNormal))));#1#
                 }
 
                 inner.Add (new Wall (new Points {innerPoint.Value, nextInnerPoint.Value}, innerOpenings));
@@ -187,6 +180,6 @@ namespace Model
             }
 
             return new RoomGeometry.Geometry (inner, outer);
-        }
+        }*/
     }
 }

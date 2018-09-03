@@ -19,38 +19,54 @@ namespace RoomGeometry
             WallData wall,
             UnwrappedCurve unwrappedWall,
             UnwrappedCurve unwrappedWallSide,
-            Func<WallPointNormals, Vector2> normalsGetter,
-            Color color)
+            Func<WallPointNormals, Vector2> normalsGetter)
         {
-            Debug.Log (
+/*            Debug.Log (
                 $"unwrappedWall {string.Join (",", Array.ConvertAll (unwrappedWall.UnwrappedPoints, x => x.ToString ()))}");
 
             Debug.Log (
-                $"unwrappedWallSide {string.Join (",", Array.ConvertAll (unwrappedWallSide.UnwrappedPoints, x => x.ToString ()))}");
+                $"unwrappedWallSide {string.Join (",", Array.ConvertAll (unwrappedWallSide.UnwrappedPoints, x => x.ToString ()))}");*/
 
             var wallPoints = wall.Points;
-            for (int i = 0; i < wallPoints.Length - 1; i++) {
-                if (openingPoint.x < unwrappedWall.UnwrappedPoints[i].X)
+            for (int i = 1; i < wallPoints.Length; i++) {
+                if (openingPoint.x > unwrappedWall.UnwrappedPoints[i].X)
                     continue;
 
                 var normals = wall.Normals.Value;
                 var normal = normalsGetter (normals[i]);
-                var nextNormal = normalsGetter (normals[i + 1]);
-                var averageNormal = normal + nextNormal;
+                var prevNormal = normalsGetter (normals[i - 1]);
+                var averageNormal = normal + prevNormal;
                 var unwrapped = unwrappedWall
-                    .WrapBack (new Vector2 (openingPoint.x, 0f))
+                    .Unwrap (new Vector2 (openingPoint.x, 0f))
                     .ToUnityVector2 ();
+
+//                var unwrappedDebug = new Vector3 (unwrapped.x, openingPoint.y, unwrapped.y);
 
                 var unwrappedOnSide = unwrapped.TransposePoint (averageNormal, wall.Width / 2f);
                 var wrappedOnSide = unwrappedWallSide.Wrap (unwrappedOnSide);
-                var result = new Vector2 (wrappedOnSide.x, openingPoint.y); 
+                var result = new Vector2 (wrappedOnSide.x, openingPoint.y);
+
+//                var unwrappedOnSideDebug = new Vector3 (unwrappedOnSide.x, openingPoint.y, unwrappedOnSide.y);
+                
+/*                Debug.DrawLine(unwrappedDebug, unwrappedOnSideDebug, color, float.MaxValue);
+                Debug.DrawLine(unwrappedDebug, unwrappedOnSideDebug + new Vector3(normal.x, 0f, normal.y), Color.yellow, float.MaxValue);*/
+/*
                 Debug.Log (
                     $"openingPoint {openingPoint} unwrapped {unwrapped} unwrappedOnSide {unwrappedOnSide} wrappedOnSide {wrappedOnSide} result {result}");
+*/
 
                 return result;
             }
 
             throw new NotImplementedException ();
+        }
+
+        private static Vector3 GetAbsoluteHolePosition (UnwrappedCurve curve, Vector2 relativePosition)
+        {
+            var unwrapped = curve.Unwrap (new Vector2 (relativePosition.x, 0f));
+            var result = new Vector3 (unwrapped.X, relativePosition.y, unwrapped.Y);
+
+            return result;
         }
 
         public static Mesh[] GetWallMeshes (
@@ -135,13 +151,9 @@ namespace RoomGeometry
                                 wall,
                                 unwrappedWall,
                                 outerUnwrappedWall,
-                                z => z.Outer,
-                                Color.red))
+                                z => z.Outer))
                         .ToArray ())
                 .ToArray ();
-
-/*            Debug.Log (
-                $"outerHoles {string.Join (",", Array.ConvertAll (outerHoles, x => string.Join (";", Array.ConvertAll (x, y => y.ToString ()))))}");*/
 
             var innerHoles = wall
                 .Openings
@@ -154,10 +166,56 @@ namespace RoomGeometry
                                 wall,
                                 unwrappedWall,
                                 innerUnwrappedWall,
-                                z => z.Inner,
-                                Color.green))
+                                z => z.Inner))
                         .ToArray ())
                 .ToArray ();
+
+            var outerUnwrappedHoles = outerHoles
+                ?.Select (
+                    x => x
+                        .Select (y => GetAbsoluteHolePosition (outerUnwrappedWall, y))
+                        .ToArray ())
+                .ToArray ();
+
+            var innerUnwrappedHoles = innerHoles
+                ?.Select (
+                    x => x
+                        .Select (y => GetAbsoluteHolePosition (innerUnwrappedWall, y))
+                        .ToArray ())
+                .ToArray ();
+
+            List<Mesh> jambMeshes = null;
+            if (outerUnwrappedHoles != null) {
+                jambMeshes = new List<Mesh> ();
+                for (int i = 0; i < outerUnwrappedHoles.Length; i++) {
+                    var jambVertices = new List<Vector3> ();
+                    jambVertices.AddRange (innerUnwrappedHoles[i]);
+                    jambVertices.AddRange (outerUnwrappedHoles[i]);
+
+                    var jambTriangles = new List<int> ();
+                    var verticesHalfLength = outerUnwrappedHoles[i].Length;
+                    for (int j = 0; j < verticesHalfLength; j++) {
+                        var inner = j;
+                        var outer = verticesHalfLength + inner;
+                        var nextInner = (j + 1) % verticesHalfLength;
+                        var nextOuter = verticesHalfLength + nextInner;
+
+                        jambTriangles.AddRange (
+                            new[]
+                            {
+                                inner, nextInner, outer, nextInner, nextOuter, outer
+                            });
+                    }
+
+                    var jambMesh = MeshGenerator.CreateMesh (
+                        jambVertices.ToArray (),
+                        jambTriangles.ToArray (),
+                        false,
+                        $"Jamb{i}");
+                    jambMeshes.Add (jambMesh);
+                }
+            }
+
 
             Mesh innerMesh = PlaneMeshMaker.GetMesh (
                 finalInnerPoints.ToArray (),
@@ -205,7 +263,11 @@ namespace RoomGeometry
                 false,
                 "top");
 
-            return new[] {innerMesh, outerMesh, sideAMesh, sideBMesh, topMesh};
+            var result = new List<Mesh> {innerMesh, outerMesh, sideAMesh, sideBMesh, topMesh};
+            if (jambMeshes != null)
+                result.AddRange (jambMeshes);
+
+            return result.ToArray ();
         }
     }
 
@@ -224,7 +286,7 @@ namespace RoomGeometry
         }
     }
 
-    public class Opening
+/*    public class Opening
     {
         public readonly OpeningContour FrontContour;
         public readonly OpeningContour BackContour;
@@ -283,5 +345,5 @@ namespace RoomGeometry
             InnerContour = innerContour;
             OuterContour = outerContour;
         }
-    }
+    }*/
 }
