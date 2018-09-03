@@ -17,6 +17,6 @@ namespace Geometry
                 result = result.FlipYZ ();
 
             return result;
-        }
+        }        
     }
 }

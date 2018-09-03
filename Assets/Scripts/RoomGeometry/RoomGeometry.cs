@@ -13,7 +13,45 @@ namespace RoomGeometry
     public static class WallGeometry
     {
         private static List<List<Vector2>> dummyHolesList = new List<List<Vector2>> ();
-        private static SystemVector2[][] dummyHolesArrray = new SystemVector2[0][];
+
+        private static Vector2 ProjectOpeningPoint (
+            Vector2 openingPoint,
+            WallData wall,
+            UnwrappedCurve unwrappedWall,
+            UnwrappedCurve unwrappedWallSide,
+            Func<WallPointNormals, Vector2> normalsGetter,
+            Color color)
+        {
+            Debug.Log (
+                $"unwrappedWall {string.Join (",", Array.ConvertAll (unwrappedWall.UnwrappedPoints, x => x.ToString ()))}");
+
+            Debug.Log (
+                $"unwrappedWallSide {string.Join (",", Array.ConvertAll (unwrappedWallSide.UnwrappedPoints, x => x.ToString ()))}");
+
+            var wallPoints = wall.Points;
+            for (int i = 0; i < wallPoints.Length - 1; i++) {
+                if (openingPoint.x < unwrappedWall.UnwrappedPoints[i].X)
+                    continue;
+
+                var normals = wall.Normals.Value;
+                var normal = normalsGetter (normals[i]);
+                var nextNormal = normalsGetter (normals[i + 1]);
+                var averageNormal = normal + nextNormal;
+                var unwrapped = unwrappedWall
+                    .WrapBack (new Vector2 (openingPoint.x, 0f))
+                    .ToUnityVector2 ();
+
+                var unwrappedOnSide = unwrapped.TransposePoint (averageNormal, wall.Width / 2f);
+                var wrappedOnSide = unwrappedWallSide.Wrap (unwrappedOnSide);
+                var result = new Vector2 (wrappedOnSide.x, openingPoint.y); 
+                Debug.Log (
+                    $"openingPoint {openingPoint} unwrapped {unwrapped} unwrappedOnSide {unwrappedOnSide} wrappedOnSide {wrappedOnSide} result {result}");
+
+                return result;
+            }
+
+            throw new NotImplementedException ();
+        }
 
         public static Mesh[] GetWallMeshes (
             WallData prevWall,
@@ -40,13 +78,8 @@ namespace RoomGeometry
             if (prevLines.Inner.Cross (startLines.Inner, out innerStart)) {
                 Assert.IsTrue (prevLines.Outer.Cross (startLines.Outer, out outerStart));
             } else {
-                innerStart = innerPoints
-                    .First ()
-                    .ToUnityVector2 ();
-
-                outerStart = outerPoints
-                    .First ()
-                    .ToUnityVector2 ();
+                innerStart = innerPoints.First ();
+                outerStart = outerPoints.First ();
             }
 
             if (nextLines.Inner.Cross (endLines.Inner, out innerEnd)) {
@@ -54,26 +87,19 @@ namespace RoomGeometry
             } else {
                 switch (wall.WidthChangeType) {
                     case WidthChangeType.Type1:
-                        innerEnd = innerPoints
-                            .Last ()
-                            .ToUnityVector2 ();
-
-                        outerEnd = outerPoints
-                            .Last ()
-                            .ToUnityVector2 ();
+                        innerEnd = innerPoints.Last ();
+                        outerEnd = outerPoints.Last ();
                         break;
                     case WidthChangeType.Type2:
                         innerEnd = nextWall
                             .InnerPoints
                             .Value
-                            .First ()
-                            .ToUnityVector2 ();
+                            .First ();
 
                         outerEnd = nextWall
                             .OuterPoints
                             .Value
-                            .First ()
-                            .ToUnityVector2 ();
+                            .First ();
 
                         break;
                     default:
@@ -81,51 +107,93 @@ namespace RoomGeometry
                 }
             }
 
-            var finalInnerPoints = new List<SystemVector2> ();
-            finalInnerPoints.Add (innerStart.ToSystemVector2 ());
-            finalInnerPoints.AddRange (innerPoints.Where ((_, i) => i > 0 && i < innerPoints.Length - 1));
-            finalInnerPoints.Add (innerEnd.ToSystemVector2 ());
+            var finalInnerPointsList = new List<Vector2> ();
+            finalInnerPointsList.Add (innerStart);
+            finalInnerPointsList.AddRange (innerPoints.Where ((_, i) => i > 0 && i < innerPoints.Length - 1));
+            finalInnerPointsList.Add (innerEnd);
 
-            var finalOuterPoints = new List<SystemVector2> ();
-            finalOuterPoints.Add (outerStart.ToSystemVector2 ());
-            finalOuterPoints.AddRange (outerPoints.Where ((_, i) => i > 0 && i < outerPoints.Length - 1));
-            finalOuterPoints.Add (outerEnd.ToSystemVector2 ());
+            var finalOuterPointsList = new List<Vector2> ();
+            finalOuterPointsList.Add (outerStart);
+            finalOuterPointsList.AddRange (outerPoints.Where ((_, i) => i > 0 && i < outerPoints.Length - 1));
+            finalOuterPointsList.Add (outerEnd);
+
+            var finalInnerPoints = finalInnerPointsList.ToArray ();
+            var finalOuterPoints = finalOuterPointsList.ToArray ();
+
+            var unwrappedWall = new UnwrappedCurve (wall.Points);
+            var outerUnwrappedWall = new UnwrappedCurve (finalOuterPoints);
+            var innerUnwrappedWall = new UnwrappedCurve (finalInnerPoints);
+
+            var outerHoles = wall
+                .Openings
+                ?.Select (
+                    x => x
+                        .Points
+                        .Select (
+                            y => ProjectOpeningPoint (
+                                y,
+                                wall,
+                                unwrappedWall,
+                                outerUnwrappedWall,
+                                z => z.Outer,
+                                Color.red))
+                        .ToArray ())
+                .ToArray ();
+
+/*            Debug.Log (
+                $"outerHoles {string.Join (",", Array.ConvertAll (outerHoles, x => string.Join (";", Array.ConvertAll (x, y => y.ToString ()))))}");*/
+
+            var innerHoles = wall
+                .Openings
+                ?.Select (
+                    x => x
+                        .Points
+                        .Select (
+                            y => ProjectOpeningPoint (
+                                y,
+                                wall,
+                                unwrappedWall,
+                                innerUnwrappedWall,
+                                z => z.Inner,
+                                Color.green))
+                        .ToArray ())
+                .ToArray ();
 
             Mesh innerMesh = PlaneMeshMaker.GetMesh (
                 finalInnerPoints.ToArray (),
-                dummyHolesArrray,
+                innerHoles,
                 wall.Height,
                 "inner");
             Mesh outerMesh = PlaneMeshMaker.GetMesh (
                 finalOuterPoints.ToArray (),
-                dummyHolesArrray,
+                outerHoles,
                 wall.Height,
                 "outer");
             outerMesh.FlipFaces ();
 
             float height = wall.Height;
             Mesh sideAMesh = PlaneMeshMaker.GetMesh (
-                finalOuterPoints.First ().ToUnityVector3 (height, true),
-                finalOuterPoints.First ().ToUnityVector3 (0, true),
-                finalInnerPoints.First ().ToUnityVector3 (0, true),
-                finalInnerPoints.First ().ToUnityVector3 (height, true),
+                finalOuterPoints.First ().ToVector3 (height, true),
+                finalOuterPoints.First ().ToVector3 (0, true),
+                finalInnerPoints.First ().ToVector3 (0, true),
+                finalInnerPoints.First ().ToVector3 (height, true),
                 "leftside");
 
             Mesh sideBMesh = PlaneMeshMaker.GetMesh (
-                finalOuterPoints.Last ().ToUnityVector3 (height, true),
-                finalInnerPoints.Last ().ToUnityVector3 (height, true),
-                finalInnerPoints.Last ().ToUnityVector3 (0, true),
-                finalOuterPoints.Last ().ToUnityVector3 (0, true),
+                finalOuterPoints.Last ().ToVector3 (height, true),
+                finalInnerPoints.Last ().ToVector3 (height, true),
+                finalInnerPoints.Last ().ToVector3 (0, true),
+                finalOuterPoints.Last ().ToVector3 (0, true),
                 "rightside");
 
-            var topVertices = new List<SystemVector2> (finalInnerPoints);
+            var topVertices = new List<Vector2> (finalInnerPoints);
             topVertices.Reverse ();
             topVertices.AddRange (finalOuterPoints);
 
             List<Vector3> vertices;
             List<int> triangles;
             MeshGenerator.Triangulate (
-                topVertices.ConvertAll (x => x.ToUnityVector2 ()),
+                topVertices,
                 dummyHolesList,
                 false,
                 out vertices,

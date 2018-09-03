@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using Geometry;
 using Model;
-using Parabox.CSG;
 using RoomGeometry;
 using UnityEngine;
 using Openings = Model.Openings;
@@ -373,39 +371,64 @@ public class MeshMaker : MonoBehaviour
                 }));
     }
 
+    private Vector2[] CreateBezierHoleShape ()
+    {
+        var q = 20;
+        var s1 = new QuadraticBezierSegment (0.5f, 0.25f, 0.25f, 0.625f, 0.5f, 1f, q);
+        var s2 = new QuadraticBezierSegment (0.5f, 1f, 0.625f, 1.25f, 0.5f, 1.5f, q);
+        var s3 = new QuadraticBezierSegment (0.5f, 1.5f, 0.875f, 1.375f, 1f, 1f, q);
+        var s4 = new QuadraticBezierSegment (1f, 1f, 1.125f, 0.375f, 0.75f, 0.25f, q);
+        var s5 = new QuadraticBezierSegment (0.75f, 0.25f, 0.625f, 0.125f, 0.5f, 0.25f, q);
+
+        var result = new List<Vector2> (s1.Points);
+        result.AddRange (s2.Points);
+        result.AddRange (s3.Points);
+        result.AddRange (s4.Points);
+        result.AddRange (s5.Points);
+
+        return result.ToArray ();
+    }
+
+    private Vector2[] CreateRectHoleShape ()
+    {
+        return new[]
+            {new Vector2 (0.5f, 0.25f), new Vector2 (0.5f, 1.5f), new Vector2 (1f, 1.5f), new Vector2 (1f, 0.25f)};
+    }
+
     private void PlaneGenerationTest ()
     {
-        var bezierSegment = new QuadraticBezierSegment (
-            new Vector2 (0f, 0f),
-            new Vector2 (1.5f, -1f),
-            new Vector2 (3f, 0f),
-            50);
+        var q = 50;
+        var countourSegment = new QuadraticBezierSegment (
+            new Vector2 (4f, 1f),
+            
+            new Vector2 (2.5f, 0f),
+            new Vector2 (1f, 1f),
+            q);
+
+
+/*        var bottomSegment = new QuadraticBezierSegment (
+            new Vector2 (0f, 0.2f),
+            new Vector2 (0.5f, 0.1f),
+            new Vector2 (1f, 0.2f),
+            q);
 
         var opening = new List<Vector2> ();
         var minX = 0.1f;
         var maxX = 0.3f;
-        var q = Mathf.RoundToInt (50 * (maxX - minX));
         for (int i = 0; i < q; i++) {
             var f = (float) i / (q - 1);
-            opening.Add (new Vector2 (f * (maxX - minX) + minX, 0.35f));
+            opening.Add (new Vector2 (f * (maxX - minX) + minX, bottomSegment.Points[i].y));
         }
 
         opening.AddRange (
             opening
-                .Select (x => new Vector2 (x.x, 0.85f))
+                .Select (x => new Vector2 (x.x, x.y + 0.6f))
                 .Reverse ()
-                .ToArray ());
+                .ToArray ());*/
 
         //Flat plane
 
-/*        var hole = new[]
-        {
-            new SystemVector2 (0.2f, 0.2f),
-            new SystemVector2 (0.2f, 0.8f),
-            new SystemVector2 (0.5f, 0.8f),
-            new SystemVector2 (0.5f, 0.2f)
-        };
-        var mesh = PlaneMeshMaker.GetMesh (
+/*        var mesh = PlaneMeshMaker.GetMesh (
             new StreightLineSegment (
                     Vector2.zero,
                     new Vector2 (5f, 0f))
@@ -415,23 +438,49 @@ public class MeshMaker : MonoBehaviour
 //            null,
             new[]
             {
-                hole,
-                Array.ConvertAll (hole, x => x + new SystemVector2 (0.31f, 0.1f))
+                CreateHoleShape ()
             },
             2f);*/
 
         //Curved plane
         var mesh = PlaneMeshMaker.GetMesh (
-            bezierSegment.Points.ConvertAll (x => x.ToSystemVector2 ()).ToArray (),
+            countourSegment.Points.ToArray (),
 //            null,  //No holes
             new[]
             {
-                opening.ConvertAll (x => x.ToSystemVector2 ()).ToArray (),
-                opening.ConvertAll (x => (x + new Vector2 (0.31f, 0f)).ToSystemVector2 ()).ToArray ()
+                CreateBezierHoleShape ()
             },
             2f);
 
         MeshGenerator.CreateGameObject ("qqq", mesh);
+    }
+
+    private void SingleWallTest ()
+    {
+        var nextWall = WallData.CreateStreight (new Vector2 (0f, 0f), new Vector2 (0f, 2f), 0.2f, 2f);
+        var prevWall = WallData.CreateStreight (new Vector2 (3f, 2f), new Vector2 (3f, 0f), 0.1f, 2f);
+/*        var wall = WallData.CreateStreight (
+            new Vector2 (3f, 0f),
+            new Vector2 (0f, 0f),
+            0.3f,
+            2f,
+            new[] {new OpeningData (OpeningType.Through, CreateRectHoleShape ())});*/
+        var wall = WallData.CreateCurved (
+            new Vector2 (3f, 0f),
+            new Vector2 (1.5f, -1f),
+            new Vector2 (0f, 0f),
+            0.3f,
+            2f,
+            new[] {new OpeningData (OpeningType.Through, CreateBezierHoleShape ())});
+
+        var meshes = WallGeometry.GetWallMeshes (prevWall, wall, nextWall);
+        var parent = new GameObject ("Wall").transform;
+        foreach (var mesh in meshes) {
+            MeshGenerator
+                .CreateGameObject (mesh.name, mesh)
+                .transform
+                .SetParent (parent, false);
+        }
     }
 
     private void WallsTest ()
@@ -474,8 +523,8 @@ public class MeshMaker : MonoBehaviour
     private void Start ()
     {
 //        PlaneGenerationTest ();
-        WallsTest ();
-
+//        WallsTest ();
+        SingleWallTest ();
 
         return;
 

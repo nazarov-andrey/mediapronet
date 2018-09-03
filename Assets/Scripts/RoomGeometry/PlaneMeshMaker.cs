@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using Geometry;
 using UnityEngine;
 using SystemVector2 = System.Numerics.Vector2;
 using SystemVector3 = System.Numerics.Vector3;
-using Vector2 = UnityEngine.Vector2;
-using Vector3 = UnityEngine.Vector3;
 
 namespace RoomGeometry
 {
@@ -102,21 +99,51 @@ namespace RoomGeometry
         }
 
         public static Mesh GetMesh (
+            Vector2[] contour,
+            Vector2[][] sourceHoles,
+            float height,
+            string name = null)
+        {
+            return GetMesh (
+                Array.ConvertAll (contour, x => x.ToSystemVector2 ()),
+                sourceHoles == null
+                    ? null
+                    : Array.ConvertAll (sourceHoles, x => Array.ConvertAll (x, y => y.ToSystemVector2 ())),
+                height,
+                name);
+        }
+
+        public static Mesh GetMesh (
             SystemVector2[] contour,
-            SystemVector2[][] normalizedHoles,
+            SystemVector2[][] sourceHoles,
+            float height,
+            string name = null)
+        {
+            return GetMesh (
+                new UnwrappedCurve (contour),
+                sourceHoles,
+                height,
+                name);
+        }
+
+        public static Mesh GetMesh (
+            UnwrappedCurve unwrappedCurve,
+            SystemVector2[][] sourceHoles,
             float height,
             string name = null)
         {
             using (new ProfileBlock ("GetMesh")) {
-                var unwrappedCurve = new UnwrappedCurve (contour, Matrix3x2.CreateTranslation (-contour[0]));
                 var unwrappedPoints = unwrappedCurve.UnwrappedPoints.ToList ();
                 var sourceVerticesBottomLine = unwrappedPoints.ConvertAll (x => x.ToUnityVector2 ());
                 var width = unwrappedPoints.Last ().X;
-                var holes = normalizedHoles
-                    ?.Select (x => x.Select (y => new Vector2 (width * y.X, height * y.Y)).ToList ())
-                    .ToList ();
+                var holes = sourceHoles
+                    ?.ToList ()
+                    .ConvertAll (
+                        x => x
+                            .ToList ()
+                            .ConvertAll (y => y.ToUnityVector2 ()));
 
-                if (holes == null) {
+                if (holes == null || holes.Count == 0) {
                     var sourceVerticesTopLine = sourceVerticesBottomLine
                         .Select (x => x + new Vector2 (0f, height))
                         .Reverse ()

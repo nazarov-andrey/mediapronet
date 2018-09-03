@@ -19,10 +19,14 @@ namespace Geometry
         {
             return new SystemVector2 (vector.x, vector.y);
         }
-
-        public static Vector3 ToVector3 (this Vector2 vector, float z = 0f)
+        
+        public static Vector3 ToVector3 (this Vector2 vector, float z = 0f, bool flipYZ = false)
         {
-            return new Vector3 (vector.x, vector.y, z);
+            var result = new Vector3 (vector.x, vector.y, z);
+            if (flipYZ)
+                result = result.FlipYZ ();
+
+            return result;
         }
     }
 }

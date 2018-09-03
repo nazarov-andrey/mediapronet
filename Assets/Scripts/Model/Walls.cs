@@ -10,16 +10,12 @@ namespace Model
 {
     public class WallPointNormals
     {
-        public readonly SystemVector2 Inner;
-        public readonly SystemVector2 Outer;
+        public readonly Vector2 Inner;
+        public readonly Vector2 Outer;
 
-        public WallPointNormals (Vector2 inner) : this (inner.ToSystemVector2 ())
+        public WallPointNormals (Vector2 inner)
         {
-        }
-
-        public WallPointNormals (SystemVector2 inner)
-        {
-            Inner = SystemVector2.Normalize (inner);
+            Inner = inner.normalized;
             Outer = Inner * -1f;
         }
     }
@@ -44,9 +40,9 @@ namespace Model
     public class OpeningData
     {
         public readonly OpeningType Type;
-        public readonly SystemVector2[] Points;
+        public readonly Vector2[] Points;
 
-        public OpeningData (OpeningType type, SystemVector2[] points)
+        public OpeningData (OpeningType type, Vector2[] points)
         {
             Type = type;
             Points = points;
@@ -55,21 +51,21 @@ namespace Model
 
     public class WallData
     {
-        public readonly SystemVector2[] Points;
+        public readonly Vector2[] Points;
         public readonly float Width;
         public readonly float Height;
         public readonly OpeningData[] Openings;
         public readonly WidthChangeType WidthChangeType;
 
-        public readonly Lazy<SystemVector2[]> InnerPoints;
-        public readonly Lazy<SystemVector2[]> OuterPoints;
+        public readonly Lazy<Vector2[]> InnerPoints;
+        public readonly Lazy<Vector2[]> OuterPoints;
         public readonly Lazy<float> StartAngle;
         public readonly Lazy<float> EndAngle;
         public readonly Lazy<WallPointNormals[]> Normals;
         public readonly Lazy<WallSegmentLines[]> Lines;
 
         public WallData (
-            SystemVector2[] points,
+            Vector2[] points,
             float width,
             float height,
             OpeningData[] openings,
@@ -85,14 +81,14 @@ namespace Model
             EndAngle = new Lazy<float> (GetEndAngle);
             Normals = new Lazy<WallPointNormals[]> (GetNormals);
             Lines = new Lazy<WallSegmentLines[]> (GetLines);
-            InnerPoints = new Lazy<SystemVector2[]> (GetInnerPoints);
-            OuterPoints = new Lazy<SystemVector2[]> (GetOuterPoints);
+            InnerPoints = new Lazy<Vector2[]> (GetInnerPoints);
+            OuterPoints = new Lazy<Vector2[]> (GetOuterPoints);
         }
 
-        private SystemVector2[] GetInnerPoints ()
+        private Vector2[] GetInnerPoints ()
         {
             var normals = Normals.Value;
-            var innerPoints = new SystemVector2[Points.Length];
+            var innerPoints = new Vector2[Points.Length];
             for (int i = 0; i < Points.Length; i++) {
                 innerPoints[i] = Points[i] + normals[i].Inner * Width / 2f;
             }
@@ -100,10 +96,10 @@ namespace Model
             return innerPoints;
         }
 
-        private SystemVector2[] GetOuterPoints ()
+        private Vector2[] GetOuterPoints ()
         {
             var normals = Normals.Value;
-            var outerPoints = new SystemVector2[Points.Length];
+            var outerPoints = new Vector2[Points.Length];
             for (int i = 0; i < Points.Length; i++) {
                 outerPoints[i] = Points[i] + normals[i].Outer * Width / 2f;
             }
@@ -158,7 +154,9 @@ namespace Model
         public WallData Transform (Matrix3x2 matrix)
         {
             return new WallData (
-                Array.ConvertAll (Points, x => SystemVector2.Transform (x, matrix)),
+                Array.ConvertAll (
+                    Points,
+                    x => SystemVector2.Transform (x.ToSystemVector2 (), matrix).ToUnityVector2 ()),
                 Width,
                 Height,
                 Openings,
@@ -174,7 +172,7 @@ namespace Model
             WidthChangeType widthChangeType = WidthChangeType.Type1)
         {
             return new WallData (
-                new[] {start.ToSystemVector2 (), end.ToSystemVector2 ()},
+                new[] {start, end},
                 width,
                 height,
                 openings,
@@ -189,14 +187,11 @@ namespace Model
             float height,
             OpeningData[] openings = null,
             WidthChangeType widthChangeType = WidthChangeType.Type1,
-            int quality = 15)
+            int quality = 50)
         {
             var bezierSegment = new QuadraticBezierSegment (p0, p1, p2, quality);
             return new WallData (
-                bezierSegment
-                    .Points
-                    .ConvertAll (x => x.ToSystemVector2 ())
-                    .ToArray (),
+                bezierSegment.Points.ToArray (),
                 width,
                 height,
                 openings,

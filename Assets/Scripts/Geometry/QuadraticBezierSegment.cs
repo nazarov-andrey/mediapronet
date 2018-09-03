@@ -8,6 +8,11 @@ namespace Geometry
         private readonly Vector2 p1;
         private readonly Vector2 p2;
 
+        public QuadraticBezierSegment (float x0, float y0, float x1, float y1, float x2, float y2, int quality)
+            : this (new Vector2 (x0, y0), new Vector2 (x1, y1), new Vector2 (x2, y2), quality)
+        {
+        }
+
         public QuadraticBezierSegment (Vector2 p0, Vector2 p1, Vector2 p2, int quality)
         {
             quality = Mathf.Max (3, quality);
