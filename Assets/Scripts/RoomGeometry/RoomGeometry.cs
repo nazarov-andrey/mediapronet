@@ -12,9 +12,57 @@ namespace RoomGeometry
 {
     public static class WallGeometry
     {
+        struct OpeningPoint2D
+        {
+            public readonly Vector2 Position;
+            public readonly Vector2 Normal;
+
+            public OpeningPoint2D (Vector2 position, Vector2 normal)
+            {
+                Position = position;
+                Normal = normal;
+            }
+        }
+
+        struct OpeningPoint3D
+        {
+            public readonly Vector3 Position;
+            public readonly Vector3 Normal;
+
+            public OpeningPoint3D (Vector3 position, Vector3 normal)
+            {
+                Position = position;
+                Normal = normal;
+            }
+        }
+
+        struct Hole2DProjection
+        {
+            public readonly OpeningPoint2D[] Points;
+            public readonly OpeningData Opening;
+
+            public Hole2DProjection (OpeningPoint2D[] points, OpeningData opening)
+            {
+                Points = points;
+                Opening = opening;
+            }
+        }
+
+        struct Hole3DProjection
+        {
+            public readonly OpeningPoint3D[] Points;
+            public readonly OpeningData Opening;
+
+            public Hole3DProjection (OpeningPoint3D[] points, OpeningData opening)
+            {
+                Points = points;
+                Opening = opening;
+            }
+        }
+
         private static List<List<Vector2>> dummyHolesList = new List<List<Vector2>> ();
 
-        private static Vector2 ProjectOpeningPoint (
+        private static OpeningPoint2D ProjectOpeningPoint (
             Vector2 openingPoint,
             WallData wall,
             UnwrappedCurve unwrappedWall,
@@ -47,26 +95,93 @@ namespace RoomGeometry
                 var result = new Vector2 (wrappedOnSide.x, openingPoint.y);
 
 //                var unwrappedOnSideDebug = new Vector3 (unwrappedOnSide.x, openingPoint.y, unwrappedOnSide.y);
-                
-/*                Debug.DrawLine(unwrappedDebug, unwrappedOnSideDebug, color, float.MaxValue);
-                Debug.DrawLine(unwrappedDebug, unwrappedOnSideDebug + new Vector3(normal.x, 0f, normal.y), Color.yellow, float.MaxValue);*/
+
+//                Debug.DrawLine(unwrappedDebug, unwrappedOnSideDebug, color, float.MaxValue);
+//                Debug.DrawLine(unwrappedDebug, unwrappedOnSideDebug + new Vector3(normal.x, 0f, normal.y), Color.yellow, float.MaxValue);
 /*
                 Debug.Log (
                     $"openingPoint {openingPoint} unwrapped {unwrapped} unwrappedOnSide {unwrappedOnSide} wrappedOnSide {wrappedOnSide} result {result}");
 */
 
-                return result;
+                return new OpeningPoint2D (result, -averageNormal);
             }
 
             throw new NotImplementedException ();
         }
 
-        private static Vector3 GetAbsoluteHolePosition (UnwrappedCurve curve, Vector2 relativePosition)
+        private static OpeningPoint3D GetHole3DPoint (UnwrappedCurve curve, OpeningPoint2D point2D)
         {
-            var unwrapped = curve.Unwrap (new Vector2 (relativePosition.x, 0f));
-            var result = new Vector3 (unwrapped.X, relativePosition.y, unwrapped.Y);
+            var unwrapped = curve.Unwrap (new Vector2 (point2D.Position.x, 0f));
+            var result = new Vector3 (unwrapped.X, point2D.Position.y, unwrapped.Y);
 
-            return result;
+            return new OpeningPoint3D (
+                result,
+                new Vector3 (point2D.Normal.x, 0f, point2D.Normal.y));
+        }
+
+        private static IEnumerable<Mesh> ProcessJambs (
+            Hole3DProjection[] hole3DProjections,
+            Hole3DProjection[] oppositeHole3DProjections,
+            Predicate<OpeningData> isThroughPredicate,
+            string name,
+            bool flipFaces = false)
+        {
+            var jambMeshes = new List<Mesh> ();
+            for (int i = 0; i < hole3DProjections.Length; i++) {
+                var main3DHole = hole3DProjections[i];
+                var opening = main3DHole.Opening;
+                var jambVertices = new List<Vector3> ();
+
+                if (isThroughPredicate (opening)) {
+                    var opposite3DHole = oppositeHole3DProjections
+                        .First (x => x.Opening == main3DHole.Opening);
+                    jambVertices
+                        .AddRange (
+                            opposite3DHole
+                                .Points
+                                .Select (x => x.Position)
+                                .ToArray ());
+                } else {
+                    var backPoints = main3DHole
+                        .Points
+                        .Select (x => x.Position.TransposePoint (x.Normal, opening.Depth))
+                        .ToArray ();
+                    
+                    
+
+                    jambVertices.AddRange (backPoints);
+                }
+
+                jambVertices.AddRange (
+                    main3DHole
+                        .Points
+                        .Select (x => x.Position)
+                        .ToArray ());
+
+                var jambTriangles = new List<int> ();
+                var verticesHalfLength = main3DHole.Points.Length;
+                for (int j = 0; j < verticesHalfLength; j++) {
+                    var inner = j;
+                    var outer = verticesHalfLength + inner;
+                    var nextInner = (j + 1) % verticesHalfLength;
+                    var nextOuter = verticesHalfLength + nextInner;
+
+                    jambTriangles.AddRange (
+                        new[]
+                        {
+                            inner, nextInner, outer, nextInner, nextOuter, outer
+                        });
+                }
+
+                var jambMesh = MeshGenerator.CreateMesh (
+                    jambVertices.ToArray (),
+                    jambTriangles.ToArray (),
+                    flipFaces,
+                    $"{name} {i}");
+                jambMeshes.Add (jambMesh);
+            }
+
+            return jambMeshes;
         }
 
         public static Mesh[] GetWallMeshes (
@@ -135,96 +250,97 @@ namespace RoomGeometry
 
             var finalInnerPoints = finalInnerPointsList.ToArray ();
             var finalOuterPoints = finalOuterPointsList.ToArray ();
-
             var unwrappedWall = new UnwrappedCurve (wall.Points);
             var outerUnwrappedWall = new UnwrappedCurve (finalOuterPoints);
             var innerUnwrappedWall = new UnwrappedCurve (finalInnerPoints);
 
-            var outerHoles = wall
+            var outer2DHoles = wall
                 .Openings
-                ?.Select (
-                    x => x
-                        .Points
-                        .Select (
-                            y => ProjectOpeningPoint (
-                                y,
-                                wall,
-                                unwrappedWall,
-                                outerUnwrappedWall,
-                                z => z.Outer))
-                        .ToArray ())
+                ?.Where (x => x.Type.HasFlag (OpeningType.Outer))
+                .Select (
+                    x => new Hole2DProjection (
+                        x
+                            .Points
+                            .Select (
+                                y => ProjectOpeningPoint (
+                                    y,
+                                    wall,
+                                    unwrappedWall,
+                                    outerUnwrappedWall,
+                                    z => z.Outer))
+                            .ToArray (),
+                        x))
                 .ToArray ();
 
-            var innerHoles = wall
+            var inner2DHoles = wall
                 .Openings
-                ?.Select (
-                    x => x
-                        .Points
-                        .Select (
-                            y => ProjectOpeningPoint (
-                                y,
-                                wall,
-                                unwrappedWall,
-                                innerUnwrappedWall,
-                                z => z.Inner))
-                        .ToArray ())
+                ?.Where (x => x.Type.HasFlag (OpeningType.Inner))
+                .Select (
+                    x => new Hole2DProjection (
+                        x
+                            .Points
+                            .Select (
+                                y => ProjectOpeningPoint (
+                                    y,
+                                    wall,
+                                    unwrappedWall,
+                                    innerUnwrappedWall,
+                                    z => z.Inner))
+                            .ToArray (),
+                        x))
                 .ToArray ();
 
-            var outerUnwrappedHoles = outerHoles
+            var outer3DHoles = outer2DHoles
                 ?.Select (
-                    x => x
-                        .Select (y => GetAbsoluteHolePosition (outerUnwrappedWall, y))
-                        .ToArray ())
+                    x => new Hole3DProjection (
+                        x
+                            .Points
+                            .Select (y => GetHole3DPoint (outerUnwrappedWall, y))
+                            .ToArray (),
+                        x.Opening
+                    ))
                 .ToArray ();
 
-            var innerUnwrappedHoles = innerHoles
+            var inner3DHoles = inner2DHoles
                 ?.Select (
-                    x => x
-                        .Select (y => GetAbsoluteHolePosition (innerUnwrappedWall, y))
-                        .ToArray ())
+                    x => new Hole3DProjection (
+                        x
+                            .Points
+                            .Select (y => GetHole3DPoint (innerUnwrappedWall, y))
+                            .ToArray (),
+                        x.Opening))
                 .ToArray ();
 
             List<Mesh> jambMeshes = null;
-            if (outerUnwrappedHoles != null) {
+            if (outer3DHoles != null) {
                 jambMeshes = new List<Mesh> ();
-                for (int i = 0; i < outerUnwrappedHoles.Length; i++) {
-                    var jambVertices = new List<Vector3> ();
-                    jambVertices.AddRange (innerUnwrappedHoles[i]);
-                    jambVertices.AddRange (outerUnwrappedHoles[i]);
-
-                    var jambTriangles = new List<int> ();
-                    var verticesHalfLength = outerUnwrappedHoles[i].Length;
-                    for (int j = 0; j < verticesHalfLength; j++) {
-                        var inner = j;
-                        var outer = verticesHalfLength + inner;
-                        var nextInner = (j + 1) % verticesHalfLength;
-                        var nextOuter = verticesHalfLength + nextInner;
-
-                        jambTriangles.AddRange (
-                            new[]
-                            {
-                                inner, nextInner, outer, nextInner, nextOuter, outer
-                            });
-                    }
-
-                    var jambMesh = MeshGenerator.CreateMesh (
-                        jambVertices.ToArray (),
-                        jambTriangles.ToArray (),
-                        false,
-                        $"Jamb{i}");
-                    jambMeshes.Add (jambMesh);
-                }
+                jambMeshes.AddRange (
+                    ProcessJambs (
+                        outer3DHoles,
+                        inner3DHoles,
+                        x => x.Type.HasFlag (OpeningType.Through),
+                        "Outer Jamb"));
             }
 
+            if (inner3DHoles != null) {
+                jambMeshes = jambMeshes ?? new List<Mesh> ();
+                jambMeshes.AddRange (
+                    ProcessJambs (
+                        inner3DHoles,
+                        null,
+                        x => false,
+                        "Inner Jamb",
+                        true));
+            }
 
             Mesh innerMesh = PlaneMeshMaker.GetMesh (
                 finalInnerPoints.ToArray (),
-                innerHoles,
+                inner2DHoles?.Select (x => x.Points.Select (y => y.Position).ToArray ()).ToArray (),
                 wall.Height,
                 "inner");
             Mesh outerMesh = PlaneMeshMaker.GetMesh (
                 finalOuterPoints.ToArray (),
-                outerHoles,
+                outer2DHoles?.Select (x => x.Points.Select (y => y.Position).ToArray ()).ToArray (),
                 wall.Height,
                 "outer");
             outerMesh.FlipFaces ();

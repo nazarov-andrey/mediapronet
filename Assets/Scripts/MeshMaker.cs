@@ -96,8 +96,8 @@ public class MeshMaker : MonoBehaviour
             2f,
             new[]
             {
-                new OpeningData (OpeningType.Through, CreateBezierHoleShape ()),
-                new OpeningData (OpeningType.Through, CreateRectHoleShape ())
+                new OpeningData (OpeningType.Outer, CreateBezierHoleShape (), 0.05f),
+                new OpeningData (OpeningType.Inner, CreateRectHoleShape ())
             });
 
         var matrix = Matrix3x2.CreateTranslation (0f, 3f);

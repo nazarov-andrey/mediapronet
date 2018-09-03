@@ -41,18 +41,20 @@ namespace Model
     {
         Inner = 1,
         Outer = 2,
-        Through = Inner | Outer 
+        Through = Inner | Outer
     }
-    
+
     public class OpeningData
     {
         public readonly OpeningType Type;
         public readonly Vector2[] Points;
+        public readonly float Depth;
 
-        public OpeningData (OpeningType type, Vector2[] points)
+        public OpeningData (OpeningType type, Vector2[] points, float depth = 0.1f)
         {
             Type = type;
             Points = points;
+            Depth = depth;
         }
     }
 
