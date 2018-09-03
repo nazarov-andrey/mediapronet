@@ -73,7 +73,7 @@ namespace RoomGeometry
             return MeshGenerator.CreateMesh (vertices, trianles, false, name);
         }
 
-        private static Mesh Triangulate (
+        public static Mesh Triangulate (
             List<Vector2> sourceVertices,
             List<List<Vector2>> holes,
             UnwrappedCurve unwrappedCurve,

@@ -142,14 +142,26 @@ namespace RoomGeometry
                                 .Select (x => x.Position)
                                 .ToArray ());
                 } else {
-                    var backPoints = main3DHole
+                    var jambBackPoints = main3DHole
                         .Points
                         .Select (x => x.Position.TransposePoint (x.Normal, opening.Depth))
                         .ToArray ();
-                    
-                    
+                    jambVertices.AddRange (jambBackPoints);
 
-                    jambVertices.AddRange (backPoints);
+                    var jambCurvePoints = jambBackPoints
+                        .Select (x => new Vector2 (x.x, x.z))
+                        .OrderBy (x => x.x)
+                        .ToArray ();
+
+                    var jambCurve = new UnwrappedCurve (jambCurvePoints);
+                    var jamb2DVertices = jambBackPoints
+                        .Select (x => new Vector2 (jambCurve.Wrap (new Vector2 (x.x, x.z)).x, x.y))
+                        .ToList ();
+
+                    var mesh = PlaneMeshMaker.Triangulate (jamb2DVertices, null, jambCurve, $"{name} back {i}");
+                    if (flipFaces)
+                        mesh.FlipFaces ();
+                    jambMeshes.Add (mesh);
                 }
 
                 jambVertices.AddRange (
@@ -326,7 +338,9 @@ namespace RoomGeometry
                 jambMeshes = jambMeshes ?? new List<Mesh> ();
                 jambMeshes.AddRange (
                     ProcessJambs (
-                        inner3DHoles,
+                        inner3DHoles
+                            .Where (x => !x.Opening.Type.HasFlag (OpeningType.Through))
+                            .ToArray (),
                         null,
                         x => false,
                         "Inner Jamb",
