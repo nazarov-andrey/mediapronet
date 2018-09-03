@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Numerics;
 using Geometry;
 using UnityEngine;
@@ -37,6 +36,14 @@ namespace Model
         }
     }
 
+    [Flags]
+    public enum OpeningType
+    {
+        Inner = 1,
+        Outer = 2,
+        Through = Inner | Outer 
+    }
+    
     public class OpeningData
     {
         public readonly OpeningType Type;
@@ -203,145 +210,5 @@ namespace Model
     {
         Type1,
         Type2
-    }
-
-    public class Openings : List<IOpening>
-    {
-    }
-
-    public struct Lines
-    {
-        public readonly Line Inner;
-        public readonly Line Outer;
-        public readonly Vector2 InnerNormal;
-        public readonly Vector2 OuterNormal;
-
-        public Lines (Vector2 start, Vector2 end, float width)
-        {
-            var vector = end - start;
-            InnerNormal = vector
-                .GetNormalVector ()
-                .normalized;
-            OuterNormal = InnerNormal * -1f;
-
-            float halfStartWidth, halfEndWidth;
-            halfStartWidth = halfEndWidth = width / 2f;
-
-            Inner = Line.Create (
-                end + InnerNormal * halfStartWidth,
-                start + InnerNormal * halfEndWidth);
-            Outer = Line.Create (
-                end + OuterNormal * halfStartWidth,
-                start + OuterNormal * halfEndWidth);
-        }
-    }
-
-    public interface IWall
-    {
-        Vector2 Start { get; }
-        Vector2 End { get; }
-        Points OuterLine { get; }
-        Points InnerLine { get; }
-        float Width { get; }
-        Lines StartLines { get; }
-        Lines EndLines { get; }
-        Openings Openings { get; }
-        Vector2 Size { get; }
-        WidthChangeType WidthChangeType { get; }
-    }
-
-    public class StreightWall : IWall
-    {
-        public Vector2 Start { get; }
-        public Vector2 End { get; }
-        public Points OuterLine { get; }
-        public Points InnerLine { get; }
-        public float Width { get; }
-        public Lines StartLines { get; }
-        public Lines EndLines { get; }
-        public Openings Openings { get; }
-        public Vector2 Size { get; }
-        public WidthChangeType WidthChangeType { get; }
-
-        public StreightWall (
-            Vector2 start,
-            Vector2 end,
-            float width,
-            Openings openings,
-            WidthChangeType widthChangeType = WidthChangeType.Type1)
-        {
-            var lines = new Lines (start, end, width);
-
-            Start = start;
-            End = end;
-            Width = width;
-            Openings = openings;
-            StartLines = EndLines = lines;
-            Size = end - start;
-            WidthChangeType = widthChangeType;
-
-            OuterLine = new StreightLineSegment (
-                start + lines.OuterNormal,
-                end + lines.OuterNormal).Points;
-
-            InnerLine = new StreightLineSegment (
-                start + lines.InnerNormal,
-                end + lines.InnerNormal).Points;
-        }
-    }
-
-    public class CurvedWall : IWall
-    {
-        public Vector2 Start { get; }
-        public Vector2 End { get; }
-        public Points OuterLine { get; }
-        public Points InnerLine { get; }
-        public float Width { get; }
-        public Lines StartLines { get; }
-        public Lines EndLines { get; }
-        public Openings Openings { get; }
-
-        public Vector2 Size {
-            get { throw new NotImplementedException (); }
-        }
-
-        public WidthChangeType WidthChangeType { get; }
-
-        public CurvedWall (
-            Vector2 p0,
-            Vector2 p1,
-            Vector2 p2,
-            int quality,
-            float width,
-            Openings openings,
-            WidthChangeType widthChangeType = WidthChangeType.Type1)
-        {
-            var line = new QuadraticBezierSegment (p0, p1, p2, quality);
-            var points = line.Points;
-            var pointsCount = points.Count;
-
-            Start = p0;
-            End = p2;
-            Width = width;
-            StartLines = new Lines (points[0], points[1], width);
-            EndLines = new Lines (points[pointsCount - 2], points[pointsCount - 1], width);
-            Openings = openings;
-            WidthChangeType = widthChangeType;
-
-            var middleIndex = pointsCount / 2;
-            var middleLines = new Lines (points[middleIndex], points[middleIndex + 1], width);
-
-            OuterLine = new QuadraticBezierSegment (
-                p0 + StartLines.OuterNormal,
-                p1 + middleLines.OuterNormal,
-                p2 + StartLines.OuterNormal,
-                quality).Points;
-
-            InnerLine = new QuadraticBezierSegment (
-                p0 + StartLines.InnerNormal,
-                p1 + middleLines.InnerNormal,
-                p2 + StartLines.InnerNormal,
-                quality).Points;
-        }
     }
 }
