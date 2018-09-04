@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Numerics;
 using Geometry;
+using JetBrains.Annotations;
 using RoomGeometry;
 using UnityEngine;
 using SystemVector2 = System.Numerics.Vector2;
@@ -224,6 +226,11 @@ namespace Model
                 WidthChangeType);
         }
 
+        public override string ToString ()
+        {
+            return $"[Wall start: {Points.First ()}; end: {Points.Last()}]";
+        }
+
         public static WallData CreateStreight (
             Vector2 start,
             Vector2 end,
@@ -234,6 +241,25 @@ namespace Model
         {
             return new WallData (
                 new[] {start, end},
+                width,
+                height,
+                openings,
+                widthChangeType);
+        }
+
+        public static WallData CreateStreight (
+            float x0,
+            float y0,
+            float x1,
+            float y1,
+            float width,
+            float height,
+            OpeningData[] openings = null,
+            WidthChangeType widthChangeType = WidthChangeType.Type1)
+        {
+            return CreateStreight (
+                new Vector2 (x0, y0),
+                new Vector2 (x1, y1),
                 width,
                 height,
                 openings,
@@ -258,27 +284,51 @@ namespace Model
                 openings,
                 widthChangeType);
         }
+
+        public static WallData CreateCurved (
+            float x0,
+            float y0,
+            float x1,
+            float y1,
+            float x2,
+            float y2,
+            float width,
+            float height,
+            OpeningData[] openings = null,
+            WidthChangeType widthChangeType = WidthChangeType.Type1,
+            int quality = 50)
+        {
+            return CreateCurved (
+                new Vector2 (x0, y0),
+                new Vector2 (x1, y1),
+                new Vector2 (x2, y2),
+                width,
+                height,
+                openings,
+                widthChangeType,
+                quality);
+        }
     }
 
     public class Walls
     {
-        class PointWalls : List<WallData>
+        public class PointWalls : List<WallData>
         {
         }
 
-        private readonly Dictionary<Vector2, PointWalls> walls;
+        private readonly Dictionary<Vector2, PointWalls> pointWallsMap;
 
         public Walls ()
         {
-            walls = new Dictionary<Vector2, PointWalls> ();
+            pointWallsMap = new Dictionary<Vector2, PointWalls> ();
         }
 
-        private PointWalls GetPointWalls (Vector2 point)
+        public PointWalls GetPointWalls (Vector2 point)
         {
             PointWalls pointWalls;
-            if (!walls.TryGetValue (point, out pointWalls)) {
+            if (!pointWallsMap.TryGetValue (point, out pointWalls)) {
                 pointWalls = new PointWalls ();
-                walls.Add (point, pointWalls);
+                pointWallsMap.Add (point, pointWalls);
             }
 
             return pointWalls;
@@ -292,6 +342,8 @@ namespace Model
             GetPointWalls (start).Add (wallData);
             GetPointWalls (end).Add (wallData);
         }
+
+        public IEnumerable<Vector2> Points => pointWallsMap.Keys;
     }
 
     public enum WidthChangeType

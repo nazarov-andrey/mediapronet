@@ -9,7 +9,7 @@ using SystemVector2 = System.Numerics.Vector2;
 
 namespace RoomGeometry
 {
-    public static class WallGeometry
+    public static class WallMeshesGenerator
     {
         struct OpeningPoint2D
         {
@@ -318,8 +318,6 @@ namespace RoomGeometry
 
             var outer3DHoles = Hole2DProjectionsTo3D (outer2DHoles, outerUnwrappedWall);
             var inner3DHoles = Hole2DProjectionsTo3D (inner2DHoles, innerUnwrappedWall);
-
-            Debug.Log($"wall.StartAngle {wall.StartAngle.Value * Mathf.Rad2Deg}");
 
             bool flipInnerJambs = wall.StartAngle.Value < Mathf.PI / 2f;
             List<Mesh> jambMeshes = null;

@@ -97,11 +97,11 @@ public class MeshMaker : MonoBehaviour
             new[]
             {
                 new OpeningData (OpeningType.Outer, CreateBezierHoleShape (), 0.05f),
-//                new OpeningData (OpeningType.Inner, CreateRectHoleShape ())
+                new OpeningData (OpeningType.Inner, CreateRectHoleShape ())
             });
 
         var curvedWall2 = curvedWall1.Reverse ();
-        
+
 /*        var curvedWall2 = WallData.CreateCurved (
             new Vector2 (3f, 0f),
             new Vector2 (1.5f, -1.5f),
@@ -130,12 +130,15 @@ public class MeshMaker : MonoBehaviour
         SingleWallTest (streightWall.Transform (matrix), nextWall.Transform (matrix), prevWall.Transform (matrix));
 
         matrix = Matrix3x2.CreateTranslation (0f, -3f);
-        SingleWallTest (curvedWall2.Transform (matrix), prevWall.Reverse().Transform (matrix), nextWall.Reverse().Transform (matrix));
+        SingleWallTest (
+            curvedWall2.Transform (matrix),
+            prevWall.Reverse ().Transform (matrix),
+            nextWall.Reverse ().Transform (matrix));
     }
 
     private void SingleWallTest (WallData wall, WallData nextWall, WallData prevWall)
     {
-        var meshes = WallGeometry.GetWallMeshes (prevWall, wall, nextWall);
+        var meshes = WallMeshesGenerator.GetWallMeshes (prevWall, wall, nextWall);
         var parent = new GameObject ("Wall").transform;
         foreach (var mesh in meshes) {
             MeshGenerator
@@ -147,7 +150,15 @@ public class MeshMaker : MonoBehaviour
 
     private void WallsTest ()
     {
-        var walls = new Dictionary<Vector2, List<WallData>> ();
+        var walls = new Walls ();
+        walls.AddWallData (WallData.CreateCurved (-2f, -2f, -4f, -0f, -2, 2, 0.3f, 2f));
+        walls.AddWallData (
+            WallData.CreateStreight (-2f, 2f, 0f, 2f, 0.4f, 2f, null, WidthChangeType.Type2));
+        walls.AddWallData (WallData.CreateStreight (0f, 2f, 2f, 2f, 0.1f, 1f));
+        walls.AddWallData (WallData.CreateStreight (2f, 2f, 2f, -2f, 0.2f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, -2f, -2f, -2f, 0.5f, 2f));
+
+//        var walls = new Dictionary<Vector2, List<WallData>> ();
 
 
 /*        var walls = new[]
@@ -185,11 +196,30 @@ public class MeshMaker : MonoBehaviour
         }*/
     }
 
+    private void RoomsFinderTest ()
+    {
+        var walls = new Walls ();
+        walls.AddWallData (WallData.CreateStreight (0f, 0f, 0f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (0f, 2f, 1f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 3f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1f, 3f, 2f, 3f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, 3f, 2f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, 2f, 1f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, 2f, 2f, 0f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, 0f, 0f, 0f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 1f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1f, 1f, 0.5f, 0.5f, 0.1f, 2f));
+
+        RoomsFinder.FindRooms (walls);
+    }
+
     private void Start ()
     {
 //        PlaneGenerationTest ();
 //        WallsTest ();
-        StreightAndCurvedWallsTest ();
+//        StreightAndCurvedWallsTest ();
+
+        RoomsFinderTest ();
     }
 
     private IEnumerator LateRebuild ()
