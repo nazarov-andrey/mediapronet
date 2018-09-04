@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Geometry;
+using RoomGeometry;
 using UnityEngine;
 using SystemVector2 = System.Numerics.Vector2;
 using Vector2 = UnityEngine.Vector2;
@@ -55,6 +58,42 @@ namespace Model
             Type = type;
             Points = points;
             Depth = depth;
+        }
+
+        public OpeningData Reverse (Vector2[] wallPoints)
+        {
+            OpeningType reverseType;
+
+            switch (Type) {
+                case OpeningType.Inner:
+                    reverseType = OpeningType.Outer;
+                    break;
+                case OpeningType.Outer:
+                    reverseType = OpeningType.Inner;
+                    break;
+                case OpeningType.Through:
+                    reverseType = Type;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException ();
+            }
+
+            var curve = new UnfoldedCurve (wallPoints);
+            var width = curve
+                .UnfoldedPoints
+                .Last ()
+                .X;
+
+            var reversePoints = Points
+                .Select (
+                    (x, i) =>
+                    {
+                        var unfolded = curve.Unfold (new Vector2 (width - x.x, 0f));
+                        return new Vector2 (unfolded.X, Points[i].y);
+                    })
+                .ToArray ();
+
+            return new OpeningData (reverseType, reversePoints, Depth);
         }
     }
 
@@ -172,6 +211,19 @@ namespace Model
                 WidthChangeType);
         }
 
+        public WallData Reverse ()
+        {
+            var reversePoints = Points.Reverse ().ToArray ();
+            return new WallData (
+                reversePoints,
+                Width,
+                Height,
+                Openings
+                    ?.Select (x => x.Reverse (reversePoints))
+                    .ToArray (),
+                WidthChangeType);
+        }
+
         public static WallData CreateStreight (
             Vector2 start,
             Vector2 end,
@@ -205,6 +257,40 @@ namespace Model
                 height,
                 openings,
                 widthChangeType);
+        }
+    }
+
+    public class Walls
+    {
+        class PointWalls : List<WallData>
+        {
+        }
+
+        private readonly Dictionary<Vector2, PointWalls> walls;
+
+        public Walls ()
+        {
+            walls = new Dictionary<Vector2, PointWalls> ();
+        }
+
+        private PointWalls GetPointWalls (Vector2 point)
+        {
+            PointWalls pointWalls;
+            if (!walls.TryGetValue (point, out pointWalls)) {
+                pointWalls = new PointWalls ();
+                walls.Add (point, pointWalls);
+            }
+
+            return pointWalls;
+        }
+
+        public void AddWallData (WallData wallData)
+        {
+            var start = wallData.Points.First ();
+            var end = wallData.Points.Last ();
+
+            GetPointWalls (start).Add (wallData);
+            GetPointWalls (end).Add (wallData);
         }
     }
 

@@ -8,25 +8,25 @@ using Vector2 = UnityEngine.Vector2;
 
 namespace RoomGeometry
 {
-    public struct UnwrappedCurve
+    public struct UnfoldedCurve
     {
         public readonly Matrix3x2[] Matrices;
         public readonly Matrix3x2[] InverseMatrices;
         public readonly SystemVector2[] OriginalPoints;
-        public readonly SystemVector2[] UnwrappedPoints;
+        public readonly SystemVector2[] UnfoldedPoints;
 
-        public UnwrappedCurve (Vector2[] points)
+        public UnfoldedCurve (Vector2[] points)
             : this (
                 Array.ConvertAll (points, x => x.ToSystemVector2 ()))
         {
         }
 
-        public UnwrappedCurve (SystemVector2[] points)
+        public UnfoldedCurve (SystemVector2[] points)
         {
             Matrices = new Matrix3x2[points.Length];
             InverseMatrices = new Matrix3x2[points.Length];
             OriginalPoints = new SystemVector2[points.Length];
-            UnwrappedPoints = new SystemVector2[points.Length];
+            UnfoldedPoints = new SystemVector2[points.Length];
 
             var matrix = Matrix3x2.CreateTranslation (-points[0]);
             OriginalPoints = points;
@@ -38,7 +38,7 @@ namespace RoomGeometry
                 Assert.IsTrue (Matrix3x2.Invert (matrix, out inveseMatrix));
                 Matrices[i] = matrix;
                 InverseMatrices[i] = inveseMatrix;
-                UnwrappedPoints[i] = point;
+                UnfoldedPoints[i] = point;
 
                 if (i < count - 1) {
                     var originalNextPoint = points[i + 1];
@@ -76,7 +76,7 @@ namespace RoomGeometry
             return index;*/
         }
 
-        public SystemVector2 Wrap (SystemVector2 point)
+        public SystemVector2 Fold (SystemVector2 point)
         {
             var index = FindNearestPointIndex (OriginalPoints, point);
             var matrix = Matrices[index];
@@ -87,19 +87,19 @@ namespace RoomGeometry
             return result;
         }
 
-        public Vector2 Wrap (Vector2 point)
+        public Vector2 Fold (Vector2 point)
         {
-            return Wrap (point.ToSystemVector2 ()).ToUnityVector2 ();
+            return Fold (point.ToSystemVector2 ()).ToUnityVector2 ();
         }
 
-        public SystemVector2 Unwrap (Vector2 point)
+        public SystemVector2 Unfold (Vector2 point)
         {
-            return Unwrap (point.ToSystemVector2 ());
+            return Unfold (point.ToSystemVector2 ());
         }
 
-        public SystemVector2 Unwrap (SystemVector2 point)
+        public SystemVector2 Unfold (SystemVector2 point)
         {
-            var index = FindNearestPointIndex (UnwrappedPoints, point);
+            var index = FindNearestPointIndex (UnfoldedPoints, point);
             var matrix = InverseMatrices[index];
             point = SystemVector2.Transform (point, matrix);
 

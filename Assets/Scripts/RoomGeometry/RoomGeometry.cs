@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Geometry;
-using JetBrains.Annotations;
 using Model;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -65,8 +64,8 @@ namespace RoomGeometry
         private static OpeningPoint2D ProjectOpeningPoint (
             Vector2 openingPoint,
             WallData wall,
-            UnwrappedCurve unwrappedWall,
-            UnwrappedCurve unwrappedWallSide,
+            UnfoldedCurve unfoldedWall,
+            UnfoldedCurve unfoldedWallSide,
             Func<WallPointNormals, Vector2> normalGetter)
         {
 /*            Debug.Log (
@@ -77,21 +76,21 @@ namespace RoomGeometry
 
             var wallPoints = wall.Points;
             for (int i = 1; i < wallPoints.Length; i++) {
-                if (openingPoint.x > unwrappedWall.UnwrappedPoints[i].X)
+                if (openingPoint.x > unfoldedWall.UnfoldedPoints[i].X)
                     continue;
 
                 var normals = wall.Normals.Value;
                 var normal = normalGetter (normals[i]);
                 var prevNormal = normalGetter (normals[i - 1]);
                 var averageNormal = normal + prevNormal;
-                var unwrapped = unwrappedWall
-                    .Unwrap (new Vector2 (openingPoint.x, 0f))
+                var unwrapped = unfoldedWall
+                    .Unfold (new Vector2 (openingPoint.x, 0f))
                     .ToUnityVector2 ();
 
 //                var unwrappedDebug = new Vector3 (unwrapped.x, openingPoint.y, unwrapped.y);
 
                 var unwrappedOnSide = unwrapped.TransposePoint (averageNormal, wall.Width / 2f);
-                var wrappedOnSide = unwrappedWallSide.Wrap (unwrappedOnSide);
+                var wrappedOnSide = unfoldedWallSide.Fold (unwrappedOnSide);
                 var result = new Vector2 (wrappedOnSide.x, openingPoint.y);
 
 //                var unwrappedOnSideDebug = new Vector3 (unwrappedOnSide.x, openingPoint.y, unwrappedOnSide.y);
@@ -109,9 +108,9 @@ namespace RoomGeometry
             throw new NotImplementedException ();
         }
 
-        private static OpeningPoint3D GetHole3DPoint (UnwrappedCurve curve, OpeningPoint2D point2D)
+        private static OpeningPoint3D GetHole3DPoint (UnfoldedCurve curve, OpeningPoint2D point2D)
         {
-            var unwrapped = curve.Unwrap (new Vector2 (point2D.Position.x, 0f));
+            var unwrapped = curve.Unfold (new Vector2 (point2D.Position.x, 0f));
             var result = new Vector3 (unwrapped.X, point2D.Position.y, unwrapped.Y);
 
             return new OpeningPoint3D (
@@ -153,9 +152,9 @@ namespace RoomGeometry
                         .OrderBy (x => x.x)
                         .ToArray ();
 
-                    var jambCurve = new UnwrappedCurve (jambCurvePoints);
+                    var jambCurve = new UnfoldedCurve (jambCurvePoints);
                     var jamb2DVertices = jambBackPoints
-                        .Select (x => new Vector2 (jambCurve.Wrap (new Vector2 (x.x, x.z)).x, x.y))
+                        .Select (x => new Vector2 (jambCurve.Fold (new Vector2 (x.x, x.z)).x, x.y))
                         .ToList ();
 
                     var mesh = PlaneMeshMaker.Triangulate (jamb2DVertices, null, jambCurve, $"{name} back {i}");
@@ -198,8 +197,8 @@ namespace RoomGeometry
 
         private static Hole2DProjection[] OpeningsToHole2DProjections (
             WallData wall,
-            UnwrappedCurve mainCurve,
-            UnwrappedCurve sideCurve,
+            UnfoldedCurve mainCurve,
+            UnfoldedCurve sideCurve,
             Func<OpeningData, bool> predicate,
             Func<WallPointNormals, Vector2> normalGetter)
         {
@@ -224,7 +223,7 @@ namespace RoomGeometry
 
         private static Hole3DProjection[] Hole2DProjectionsTo3D (
             Hole2DProjection[] projections2D,
-            UnwrappedCurve curve)
+            UnfoldedCurve curve)
         {
             return projections2D
                 ?.Select (
@@ -297,9 +296,9 @@ namespace RoomGeometry
 
             var finalInnerPoints = finalInnerPointsList.ToArray ();
             var finalOuterPoints = finalOuterPointsList.ToArray ();
-            var unwrappedWall = new UnwrappedCurve (wall.Points);
-            var outerUnwrappedWall = new UnwrappedCurve (finalOuterPoints);
-            var innerUnwrappedWall = new UnwrappedCurve (finalInnerPoints);
+            var unwrappedWall = new UnfoldedCurve (wall.Points);
+            var outerUnwrappedWall = new UnfoldedCurve (finalOuterPoints);
+            var innerUnwrappedWall = new UnfoldedCurve (finalInnerPoints);
 
             var outer2DHoles =
                 OpeningsToHole2DProjections (
@@ -320,6 +319,9 @@ namespace RoomGeometry
             var outer3DHoles = Hole2DProjectionsTo3D (outer2DHoles, outerUnwrappedWall);
             var inner3DHoles = Hole2DProjectionsTo3D (inner2DHoles, innerUnwrappedWall);
 
+            Debug.Log($"wall.StartAngle {wall.StartAngle.Value * Mathf.Rad2Deg}");
+
+            bool flipInnerJambs = wall.StartAngle.Value < Mathf.PI / 2f;
             List<Mesh> jambMeshes = null;
             if (outer3DHoles != null) {
                 jambMeshes = new List<Mesh> ();
@@ -328,7 +330,8 @@ namespace RoomGeometry
                         outer3DHoles,
                         inner3DHoles,
                         x => x.Type.HasFlag (OpeningType.Through),
-                        "Outer Jamb"));
+                        "Outer Jamb",
+                        !flipInnerJambs));
             }
 
             if (inner3DHoles != null) {
@@ -341,7 +344,7 @@ namespace RoomGeometry
                         null,
                         x => false,
                         "Inner Jamb",
-                        true));
+                        flipInnerJambs));
             }
 
             Mesh innerMesh = PlaneMeshMaker.GetMesh (

@@ -76,7 +76,7 @@ namespace RoomGeometry
         public static Mesh Triangulate (
             List<Vector2> sourceVertices,
             List<List<Vector2>> holes,
-            UnwrappedCurve unwrappedCurve,
+            UnfoldedCurve unfoldedCurve,
             string name = null)
         {
             List<int> trianles;
@@ -91,7 +91,7 @@ namespace RoomGeometry
 
             for (int count = vertices.Count, i = 0; i < count; i++) {
                 var vertex = vertices[i];
-                var point = unwrappedCurve.Unwrap (new SystemVector2 (vertex.x, vertex.y));
+                var point = unfoldedCurve.Unfold (new SystemVector2 (vertex.x, vertex.y));
                 vertices[i] = new Vector3 (point.X, vertex.z, point.Y);
             }
 
@@ -120,20 +120,20 @@ namespace RoomGeometry
             string name = null)
         {
             return GetMesh (
-                new UnwrappedCurve (contour),
+                new UnfoldedCurve (contour),
                 sourceHoles,
                 height,
                 name);
         }
 
         public static Mesh GetMesh (
-            UnwrappedCurve unwrappedCurve,
+            UnfoldedCurve unfoldedCurve,
             SystemVector2[][] sourceHoles,
             float height,
             string name = null)
         {
             using (new ProfileBlock ("GetMesh")) {
-                var unwrappedPoints = unwrappedCurve.UnwrappedPoints.ToList ();
+                var unwrappedPoints = unfoldedCurve.UnfoldedPoints.ToList ();
                 var sourceVerticesBottomLine = unwrappedPoints.ConvertAll (x => x.ToUnityVector2 ());
                 var width = unwrappedPoints.Last ().X;
                 var holes = sourceHoles
@@ -152,7 +152,7 @@ namespace RoomGeometry
                     var sourceVertices = new List<Vector2> (sourceVerticesBottomLine);
                     sourceVertices.AddRange (sourceVerticesTopLine);
 
-                    return Triangulate (sourceVertices, null, unwrappedCurve, name);
+                    return Triangulate (sourceVertices, null, unfoldedCurve, name);
                 }
 
                 if (unwrappedPoints.Count == 2) {
@@ -164,7 +164,7 @@ namespace RoomGeometry
                         new Vector2 (width, 0f)
                     };
 
-                    return Triangulate (sourceVertices, holes, unwrappedCurve, name);
+                    return Triangulate (sourceVertices, holes, unfoldedCurve, name);
                 }
 
                 var sortedHoles = holes
@@ -222,7 +222,7 @@ namespace RoomGeometry
                     var chunkVertices = new List<Vector2> (chunkBottomLine);
                     chunkVertices.AddRange (chunkTopLine);
 
-                    var chunkMesh = Triangulate (chunkVertices, chunkHoles, unwrappedCurve);
+                    var chunkMesh = Triangulate (chunkVertices, chunkHoles, unfoldedCurve);
                     meshes.Add (chunkMesh);
 
                     //                MeshGenerator.CreateGameObject ("qqq", chunkMesh);
