@@ -240,6 +240,9 @@ public class MeshMaker : MonoBehaviour
     private void RoomsFinderTest ()
     {
         var walls = new Walls ();
+        walls.AddWallData (WallData.CreateStreight (1f, 2f, 0f, 3f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (0f, 2f, 0f, 3f, 0.1f, 2f));
+        
         walls.AddWallData (WallData.CreateStreight (0f, 0f, 0f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (0f, 2f, 1f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 3f, 0.1f, 2f));
@@ -250,10 +253,16 @@ public class MeshMaker : MonoBehaviour
         walls.AddWallData (WallData.CreateStreight (2f, 0f, 0f, 0f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 1f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 1f, 0.5f, 0.5f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (10f, 10f, 10f, 12f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (10f, 12f, 12f, 12f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (12f, 12f, 12f, 10f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (12f, 10f, 10f, 10f, 0.1f, 2f));
+        
+        walls.AddWallData (WallData.CreateStreight (10f, 10f, 10f, 15f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (10f, 15f, 15f, 15f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (15f, 15f, 15f, 10f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (15f, 10f, 10f, 10f, 0.1f, 2f));
+        
+        walls.AddWallData (WallData.CreateStreight (11f, 11f, 11f, 13f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (11f, 13f, 13f, 13f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (13f, 13f, 13f, 11f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (13f, 11f, 11f, 11f, 0.1f, 2f));
         
 
 /*        walls.AddWallData (WallData.CreateStreight (0f, 0f, 0f, 2f, 0.1f, 2f));
@@ -267,10 +276,10 @@ public class MeshMaker : MonoBehaviour
 
 
         var rooms = RoomsFinder.FindRooms (walls);
-        foreach (var room in rooms) {
+/*        foreach (var room in rooms) {
             Debug.Log (
                 $"room {string.Join (",", Array.ConvertAll (room, x => $"[wall {x.Points.First ()} {x.Points.Last ()}]"))}");
-        }
+        }*/
 
         for (int j = 0; j < rooms.Length; j++) {
             var roomTransform = new GameObject ($"Room {j}").transform;
