@@ -1,5 +1,7 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Geometry;
 using Model;
@@ -126,26 +128,65 @@ public class MeshMaker : MonoBehaviour
                 new OpeningData (OpeningType.Through, CreateRectHoleShape ())
             });
 
-        SingleWallTest (curvedWall1, nextWall, prevWall);
-        SingleWallTest (streightWall.Transform (matrix), nextWall.Transform (matrix), prevWall.Transform (matrix));
+        CreateWallMeshes (curvedWall1, null, null);
+//        SingleWallTest (streightWall.Transform (matrix), nextWall.Transform (matrix), prevWall.Transform (matrix));
+        CreateWallMeshes (streightWall.Transform (matrix), nextWall.Transform (matrix), null);
 
         matrix = Matrix3x2.CreateTranslation (0f, -3f);
-        SingleWallTest (
+        CreateWallMeshes (
             curvedWall2.Transform (matrix),
             prevWall.Reverse ().Transform (matrix),
             nextWall.Reverse ().Transform (matrix));
     }
 
-    private void SingleWallTest (WallData wall, WallData nextWall, WallData prevWall)
+    private void CreateWallMeshes (
+        WallData wall,
+        WallData nextWall,
+        WallData prevWall,
+        Transform parent = null)
     {
-        var meshes = WallMeshesGenerator.GetWallMeshes (prevWall, wall, nextWall);
-        var parent = new GameObject ("Wall").transform;
+        var meshes = WallMeshesGenerator.GetWallMeshes (
+            prevWall,
+            prevWall,
+            wall,
+            nextWall,
+            nextWall);
+
+        var wallTransform = new GameObject ("Wall").transform;
         foreach (var mesh in meshes) {
             MeshGenerator
                 .CreateGameObject (mesh.name, mesh)
                 .transform
-                .SetParent (parent, false);
+                .SetParent (wallTransform, false);
         }
+
+        wallTransform.SetParent (parent);
+    }
+
+    private void CreateWallMeshes (
+        WallData wall,
+        WallData nextInnerWall,
+        WallData nextOuterWall,
+        WallData prevInnerWall,
+        WallData prevOuterWall,
+        Transform parent = null)
+    {
+        var meshes = WallMeshesGenerator.GetWallMeshes (
+            prevInnerWall,
+            prevOuterWall,
+            wall,
+            nextInnerWall,
+            nextOuterWall);
+
+        var wallTransform = new GameObject ("Wall").transform;
+        foreach (var mesh in meshes) {
+            MeshGenerator
+                .CreateGameObject (mesh.name, mesh)
+                .transform
+                .SetParent (wallTransform, false);
+        }
+
+        wallTransform.SetParent (parent);
     }
 
     private void WallsTest ()
@@ -179,12 +220,12 @@ public class MeshMaker : MonoBehaviour
             WallData.CreateStreight (new Vector2 (2, 0), new Vector2 (0, -2), 0.2f, 2f)
         };*/
 
-/*        var wallsCount = walls.Length;
+/*        var wallsCount = walls.Count;
         for (int i = 0; i < wallsCount; i++) {
             var prevIndex = (i - 1 + wallsCount) % wallsCount;
             var nextIndex = (i + 1) % wallsCount;
 
-            var meshes = WallGeometry.GetWallMeshes (walls[prevIndex], walls[i], walls[nextIndex]);
+            var meshes = WallMeshesGenerator.GetWallMeshes (walls[prevIndex], walls[i], walls[nextIndex]);
             var parent = new GameObject ($"Wall {i}").transform;
             for (int j = 0; j < meshes.Length; j++) {
                 var mesh = meshes[j];
@@ -202,15 +243,64 @@ public class MeshMaker : MonoBehaviour
         walls.AddWallData (WallData.CreateStreight (0f, 0f, 0f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (0f, 2f, 1f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 3f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (1f, 3f, 2f, 3f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (2f, 3f, 2f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1f, 3f, 4f, 3f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (4f, 3f, 2f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (2f, 2f, 1f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (2f, 2f, 2f, 0f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (2f, 0f, 0f, 0f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 1f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 1f, 0.5f, 0.5f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (10f, 10f, 10f, 12f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (10f, 12f, 12f, 12f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (12f, 12f, 12f, 10f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (12f, 10f, 10f, 10f, 0.1f, 2f));
+        
 
-        RoomsFinder.FindRooms (walls);
+/*        walls.AddWallData (WallData.CreateStreight (0f, 0f, 0f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (0f, 2f, 2f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, 2f, 2f, 0f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (0f, 0f, 2f, 0f, 0.1f, 2f));*/
+        
+/*        walls.AddWallData (WallData.CreateStreight (2f, 2f, 3f, 2f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (3f, 2f, 3f, 0f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (3f, 0f, 2f, 0f, 0.1f, 2f));*/
+
+
+        var rooms = RoomsFinder.FindRooms (walls);
+        foreach (var room in rooms) {
+            Debug.Log (
+                $"room {string.Join (",", Array.ConvertAll (room, x => $"[wall {x.Points.First ()} {x.Points.Last ()}]"))}");
+        }
+
+        for (int j = 0; j < rooms.Length; j++) {
+            var roomTransform = new GameObject ($"Room {j}").transform;
+            var room = rooms[j];
+            for (int count = room.Length, i = 0; i < count; i++) {
+                var wall = room[i];
+                var wallInverseVector = wall.GetInverseVector ();
+                var prevWalls = walls
+                    .GetPointWalls (wall.Start)
+                    .Where(x => x != wall)
+                    .Select (x => wall.Start == x.End ? x : x.Reverse ())
+                    .Select (x => new Tuple<WallData, float> (x, wallInverseVector.GetWallAngle (x)))
+                    .OrderBy (x => x.Item2)
+                    .ToArray ();
+                var nextWalls = walls
+                    .GetPointWalls (wall.End)
+                    .Where(x => x != wall)
+                    .Select (x => wall.End == x.Start ? x : x.Reverse ())
+                    .Select (x => new Tuple<WallData, float> (x, wallInverseVector.GetWallAngle (x)))
+                    .OrderBy (x => x.Item2)
+                    .ToArray ();
+
+                var prevInnerWall = prevWalls.LastOrDefault ()?.Item1;
+                var prevOuterWall = prevWalls.FirstOrDefault ()?.Item1;
+                var nextInnerWall = nextWalls.FirstOrDefault ()?.Item1;
+                var nextOuterWall = nextWalls.LastOrDefault ()?.Item1;
+
+                CreateWallMeshes (wall, nextInnerWall, nextOuterWall, prevInnerWall, prevOuterWall, roomTransform);
+            }
+        }
     }
 
     private void Start ()

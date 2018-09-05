@@ -114,6 +114,9 @@ namespace Model
         public readonly Lazy<WallPointNormals[]> Normals;
         public readonly Lazy<WallSegmentLines[]> Lines;
 
+        public Vector2 Start => Points.First ();
+        public Vector2 End => Points.Last ();
+
         public WallData (
             Vector2[] points,
             float width,
@@ -343,6 +346,7 @@ namespace Model
             GetPointWalls (end).Add (wallData);
         }
 
+        public int Count => pointWallsMap.Count;
         public IEnumerable<Vector2> Points => pointWallsMap.Keys;
     }
 

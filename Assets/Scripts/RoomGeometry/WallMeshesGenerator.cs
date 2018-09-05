@@ -238,28 +238,114 @@ namespace RoomGeometry
         }
 
         public static Mesh[] GetWallMeshes (
-            WallData prevWall,
+            WallData prevInnerWall,
+            WallData prevOuterWall,
             WallData wall,
-            WallData nextWall)
+            WallData nextInnerWall,
+            WallData nextOuterWall)
         {
-            var prevLines = prevWall.Lines.Value.Last ();
-            var startLines = wall.Lines.Value.First ();
-            var endLines = wall.Lines.Value.Last ();
-            var nextLines = nextWall.Lines.Value.First ();
+/*            Debug.Log (
+                $"pi: {prevInnerWall}; po: {prevOuterWall}; w: {wall}; ni: {nextInnerWall}; no: {nextOuterWall}");*/
+
+            var prevInnerLine = prevInnerWall
+                ?.Lines
+                .Value
+                .Last ()
+                .Inner;
+
+            var prevOuterLine = prevOuterWall
+                ?.Lines
+                .Value
+                .Last ()
+                .Outer;
+
+            var nextInnerLine = nextInnerWall
+                ?.Lines
+                .Value
+                .First ()
+                .Inner;
+
+            var nextOuterLine = nextOuterWall
+                ?.Lines
+                .Value
+                .First ()
+                .Outer;
+
+/*            var prevLines = prevWall
+                ?.Lines
+                .Value
+                .Last ();
+
+            var nextLines = nextWall
+                ?.Lines
+                .Value
+                .First ();*/
+
+            var startLines = wall
+                .Lines
+                .Value
+                .First ();
+
+            var endLines = wall
+                .Lines
+                .Value
+                .Last ();
 
             Vector2 innerStart, innerEnd, outerStart, outerEnd;
 
             var innerPoints = wall.InnerPoints.Value;
             var outerPoints = wall.OuterPoints.Value;
 
-            if (prevLines.Inner.Cross (startLines.Inner, out innerStart)) {
+            if (!(prevInnerLine.HasValue && startLines.Inner.Cross (prevInnerLine.Value, out innerStart)))
+                innerStart = innerPoints.First ();
+
+            if (!(prevOuterLine.HasValue && startLines.Outer.Cross (prevOuterLine.Value, out outerStart)))
+                outerStart = outerPoints.First ();
+
+/*            if (prevLines != null && prevLines.Inner.Cross (startLines.Inner, out innerStart)) {
                 Assert.IsTrue (prevLines.Outer.Cross (startLines.Outer, out outerStart));
             } else {
                 innerStart = innerPoints.First ();
                 outerStart = outerPoints.First ();
+            }*/
+
+            if (!(nextInnerLine.HasValue && endLines.Inner.Cross (nextInnerLine.Value, out innerEnd))) {
+                switch (wall.WidthChangeType) {
+                    case WidthChangeType.Type1:
+                        innerEnd = innerPoints.Last ();
+                        break;
+                    case WidthChangeType.Type2:
+                        Assert.IsNotNull (nextInnerWall);
+                        innerEnd = nextInnerWall
+                            .InnerPoints
+                            .Value
+                            .First ();
+
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException ();
+                }
             }
 
-            if (nextLines.Inner.Cross (endLines.Inner, out innerEnd)) {
+            if (!(nextOuterLine.HasValue && endLines.Outer.Cross (nextOuterLine.Value, out outerEnd))) {
+                switch (wall.WidthChangeType) {
+                    case WidthChangeType.Type1:
+                        outerEnd = outerPoints.Last ();
+                        break;
+                    case WidthChangeType.Type2:
+                        Assert.IsNotNull (nextOuterWall);
+                        outerEnd = nextOuterWall
+                            .OuterPoints
+                            .Value
+                            .First ();
+
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException ();
+                }
+            }
+
+/*            if (nextLines != null && nextLines.Inner.Cross (endLines.Inner, out innerEnd)) {
                 nextLines.Outer.Cross (endLines.Outer, out outerEnd);
             } else {
                 switch (wall.WidthChangeType) {
@@ -282,7 +368,7 @@ namespace RoomGeometry
                     default:
                         throw new ArgumentOutOfRangeException ();
                 }
-            }
+            }*/
 
             var finalInnerPointsList = new List<Vector2> ();
             finalInnerPointsList.Add (innerStart);
@@ -359,22 +445,28 @@ namespace RoomGeometry
 
             float height = wall.Height;
             Mesh sideAMesh = PlaneMeshMaker.GetMesh (
-                finalOuterPoints.First ().ToVector3 (height, true),
-                finalOuterPoints.First ().ToVector3 (0, true),
+                "leftside",
                 finalInnerPoints.First ().ToVector3 (0, true),
-                finalInnerPoints.First ().ToVector3 (height, true),
-                "leftside");
+                wall.Start.ToVector3 (0, true),
+                finalOuterPoints.First ().ToVector3 (0, true),
+                finalOuterPoints.First ().ToVector3 (height, true),
+                wall.Start.ToVector3 (height, true),
+                finalInnerPoints.First ().ToVector3 (height, true));
 
             Mesh sideBMesh = PlaneMeshMaker.GetMesh (
-                finalOuterPoints.Last ().ToVector3 (height, true),
-                finalInnerPoints.Last ().ToVector3 (height, true),
-                finalInnerPoints.Last ().ToVector3 (0, true),
+                "rightside",
                 finalOuterPoints.Last ().ToVector3 (0, true),
-                "rightside");
+                wall.End.ToVector3 (0, true),
+                finalInnerPoints.Last ().ToVector3 (0, true),
+                finalInnerPoints.Last ().ToVector3 (height, true),
+                wall.End.ToVector3 (height, true),
+                finalOuterPoints.Last ().ToVector3 (height, true));
 
             var topVertices = new List<Vector2> (finalInnerPoints);
             topVertices.Reverse ();
+            topVertices.Add (wall.Start);
             topVertices.AddRange (finalOuterPoints);
+            topVertices.Add (wall.End);
 
             List<Vector3> vertices;
             List<int> triangles;

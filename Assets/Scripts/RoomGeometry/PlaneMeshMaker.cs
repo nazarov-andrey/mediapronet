@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Geometry;
 using UnityEngine;
+using UnityEngine.Assertions;
 using SystemVector2 = System.Numerics.Vector2;
 using SystemVector3 = System.Numerics.Vector3;
 
@@ -65,12 +66,34 @@ namespace RoomGeometry
             return new HoleData (hole, sorted.First ().x, sorted.Last ().x);
         }
 
-        public static Mesh GetMesh (Vector3 a, Vector3 b, Vector3 c, Vector3 d, string name = null)
+        public static Mesh GetMesh (params Vector3[] vertices)
         {
-            var vertices = new[] {a, b, c, d};
-            var trianles = new[] {0, 3, 2, 0, 2, 1};
+            return GetMesh (null, vertices);
+        }
 
-            return MeshGenerator.CreateMesh (vertices, trianles, false, name);
+        public static Mesh GetMesh (string name, params Vector3[] vertices)
+        {
+            Assert.IsTrue (vertices.Length % 2 == 0);
+/*            var vertices = new[] {a, b, c, d};
+            var trianles = new[] {0, 3, 2, 0, 2, 1};*/
+
+            var verticesHalfNum = vertices.Length / 2;
+            var trianglesNum = vertices.Length - 2;
+            var triangles = new int[trianglesNum * 3];
+
+            for (int i = 0; i < verticesHalfNum - 1; i++) {
+                var triangleIndex = i * 6;
+
+                triangles[triangleIndex] = i;
+                triangles[triangleIndex + 1] = i + 1;
+                triangles[triangleIndex + 2] = vertices.Length - i - 1;
+
+                triangles[triangleIndex + 3] = i + 1;
+                triangles[triangleIndex + 4] = vertices.Length - i - 2;
+                triangles[triangleIndex + 5] = vertices.Length - i - 1;
+            }
+
+            return MeshGenerator.CreateMesh (vertices, triangles, false, name);
         }
 
         public static Mesh Triangulate (
@@ -132,114 +155,112 @@ namespace RoomGeometry
             float height,
             string name = null)
         {
-            using (new ProfileBlock ("GetMesh")) {
-                var unwrappedPoints = unfoldedCurve.UnfoldedPoints.ToList ();
-                var sourceVerticesBottomLine = unwrappedPoints.ConvertAll (x => x.ToUnityVector2 ());
-                var width = unwrappedPoints.Last ().X;
-                var holes = sourceHoles
-                    ?.ToList ()
-                    .ConvertAll (
-                        x => x
-                            .ToList ()
-                            .ConvertAll (y => y.ToUnityVector2 ()));
+            var unwrappedPoints = unfoldedCurve.UnfoldedPoints.ToList ();
+            var sourceVerticesBottomLine = unwrappedPoints.ConvertAll (x => x.ToUnityVector2 ());
+            var width = unwrappedPoints.Last ().X;
+            var holes = sourceHoles
+                ?.ToList ()
+                .ConvertAll (
+                    x => x
+                        .ToList ()
+                        .ConvertAll (y => y.ToUnityVector2 ()));
 
-                if (holes == null || holes.Count == 0) {
-                    var sourceVerticesTopLine = sourceVerticesBottomLine
-                        .Select (x => x + new Vector2 (0f, height))
-                        .Reverse ()
-                        .ToList ();
+            if (holes == null || holes.Count == 0) {
+                var sourceVerticesTopLine = sourceVerticesBottomLine
+                    .Select (x => x + new Vector2 (0f, height))
+                    .Reverse ()
+                    .ToList ();
 
-                    var sourceVertices = new List<Vector2> (sourceVerticesBottomLine);
-                    sourceVertices.AddRange (sourceVerticesTopLine);
+                var sourceVertices = new List<Vector2> (sourceVerticesBottomLine);
+                sourceVertices.AddRange (sourceVerticesTopLine);
 
-                    return Triangulate (sourceVertices, null, unfoldedCurve, name);
-                }
-
-                if (unwrappedPoints.Count == 2) {
-                    var sourceVertices = new List<Vector2>
-                    {
-                        Vector2.zero,
-                        new Vector2 (0f, height),
-                        new Vector2 (width, height),
-                        new Vector2 (width, 0f)
-                    };
-
-                    return Triangulate (sourceVertices, holes, unfoldedCurve, name);
-                }
-
-                var sortedHoles = holes
-                    .Select (GetHoleData)
-                    .OrderBy (x => x.Min)
-                    .ToArray ();
-                var xs = new List<Point> (
-                    sourceVerticesBottomLine.ConvertAll (x => new Point (PointType.Regular, x.x)));
-
-                foreach (var hole in sortedHoles) {
-                    xs.Add (new Point (PointType.PointStart, hole.Min));
-                    xs.Add (new Point (PointType.PointEnd, hole.Max));
-                }
-
-                xs.Sort ((x, y) => Comparer<float>.Default.Compare (x.X, y.X));
-                var chunks = new List<List<float>> {new List<float> ()};
-                var startedCount = 0;
-                foreach (var x in xs) {
-                    chunks
-                        .Last ()
-                        .Add (x.X);
-                    switch (x.PointType) {
-                        case PointType.Regular:
-                            break;
-                        case PointType.PointStart:
-                            if (++startedCount == 1)
-                                chunks.Add (new List<float> {x.X});
-                            break;
-                        case PointType.PointEnd:
-                            if (--startedCount == 0)
-                                chunks.Add (new List<float> {x.X});
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException ();
-                    }
-                }
-
-                var meshes = new List<Mesh> ();
-                foreach (var chunk in chunks) {
-                    if (chunk.Count == 1)
-                        continue;
-
-                    var chunkBottomLine = new List<Vector2> (chunk.ConvertAll (x => new Vector2 (x, 0f)));
-                    var chunkHoles = new List<List<Vector2>> ();
-                    foreach (var x in chunk) {
-                        var holesData = Array.FindAll (sortedHoles, y => Mathf.Approximately (x, y.Min));
-                        if (holesData.Length > 0 && !Mathf.Approximately (x, chunk.Last ()))
-                            chunkHoles.AddRange (holesData.Select (y => y.Hole));
-                    }
-
-                    var chunkTopLine = chunkBottomLine
-                        .Select (x => new Vector2 (x.x, height))
-                        .Reverse ()
-                        .ToArray ();
-                    var chunkVertices = new List<Vector2> (chunkBottomLine);
-                    chunkVertices.AddRange (chunkTopLine);
-
-                    var chunkMesh = Triangulate (chunkVertices, chunkHoles, unfoldedCurve);
-                    meshes.Add (chunkMesh);
-
-                    //                MeshGenerator.CreateGameObject ("qqq", chunkMesh);
-                }
-
-                //            throw new NotImplementedException ();
-
-                var mesh = new Mesh ();
-                mesh.name = name ?? "";
-                mesh.Clear ();
-                mesh.CombineMeshes (
-                    meshes.ConvertAll (x => new CombineInstance {mesh = x}).ToArray (),
-                    true,
-                    false);
-
-                return mesh;
+                return Triangulate (sourceVertices, null, unfoldedCurve, name);
             }
+
+            if (unwrappedPoints.Count == 2) {
+                var sourceVertices = new List<Vector2>
+                {
+                    Vector2.zero,
+                    new Vector2 (0f, height),
+                    new Vector2 (width, height),
+                    new Vector2 (width, 0f)
+                };
+
+                return Triangulate (sourceVertices, holes, unfoldedCurve, name);
+            }
+
+            var sortedHoles = holes
+                .Select (GetHoleData)
+                .OrderBy (x => x.Min)
+                .ToArray ();
+            var xs = new List<Point> (
+                sourceVerticesBottomLine.ConvertAll (x => new Point (PointType.Regular, x.x)));
+
+            foreach (var hole in sortedHoles) {
+                xs.Add (new Point (PointType.PointStart, hole.Min));
+                xs.Add (new Point (PointType.PointEnd, hole.Max));
+            }
+
+            xs.Sort ((x, y) => Comparer<float>.Default.Compare (x.X, y.X));
+            var chunks = new List<List<float>> {new List<float> ()};
+            var startedCount = 0;
+            foreach (var x in xs) {
+                chunks
+                    .Last ()
+                    .Add (x.X);
+                switch (x.PointType) {
+                    case PointType.Regular:
+                        break;
+                    case PointType.PointStart:
+                        if (++startedCount == 1)
+                            chunks.Add (new List<float> {x.X});
+                        break;
+                    case PointType.PointEnd:
+                        if (--startedCount == 0)
+                            chunks.Add (new List<float> {x.X});
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException ();
+                }
+            }
+
+            var meshes = new List<Mesh> ();
+            foreach (var chunk in chunks) {
+                if (chunk.Count == 1)
+                    continue;
+
+                var chunkBottomLine = new List<Vector2> (chunk.ConvertAll (x => new Vector2 (x, 0f)));
+                var chunkHoles = new List<List<Vector2>> ();
+                foreach (var x in chunk) {
+                    var holesData = Array.FindAll (sortedHoles, y => Mathf.Approximately (x, y.Min));
+                    if (holesData.Length > 0 && !Mathf.Approximately (x, chunk.Last ()))
+                        chunkHoles.AddRange (holesData.Select (y => y.Hole));
+                }
+
+                var chunkTopLine = chunkBottomLine
+                    .Select (x => new Vector2 (x.x, height))
+                    .Reverse ()
+                    .ToArray ();
+                var chunkVertices = new List<Vector2> (chunkBottomLine);
+                chunkVertices.AddRange (chunkTopLine);
+
+                var chunkMesh = Triangulate (chunkVertices, chunkHoles, unfoldedCurve);
+                meshes.Add (chunkMesh);
+
+                //                MeshGenerator.CreateGameObject ("qqq", chunkMesh);
+            }
+
+            //            throw new NotImplementedException ();
+
+            var mesh = new Mesh ();
+            mesh.name = name ?? "";
+            mesh.Clear ();
+            mesh.CombineMeshes (
+                meshes.ConvertAll (x => new CombineInstance {mesh = x}).ToArray (),
+                true,
+                false);
+
+            return mesh;
         }
     }
 }
