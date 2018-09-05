@@ -7,6 +7,7 @@ using Geometry;
 using Model;
 using RoomGeometry;
 using UnityEngine;
+using UnityEngine.Assertions;
 using SystemVector2 = System.Numerics.Vector2;
 using Vector2 = UnityEngine.Vector2;
 
@@ -243,6 +244,7 @@ public class MeshMaker : MonoBehaviour
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 0f, 3f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (0f, 2f, 0f, 3f, 0.1f, 2f));
         
+        walls.AddWallData (WallData.CreateStreight (1f, 1f, 0.5f, 0.5f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (0f, 0f, 0f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (0f, 2f, 1f, 2f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 3f, 0.1f, 2f));
@@ -252,7 +254,10 @@ public class MeshMaker : MonoBehaviour
         walls.AddWallData (WallData.CreateStreight (2f, 2f, 2f, 0f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (2f, 0f, 0f, 0f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (1f, 2f, 1f, 1f, 0.1f, 2f));
-        walls.AddWallData (WallData.CreateStreight (1f, 1f, 0.5f, 0.5f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (2f, 0f, 1.5f, 0.5f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1.5f, 0.5f, 1.5f, 1f, 0.1f, 2f));
+        walls.AddWallData (WallData.CreateStreight (1.5f, 1f, 1f, 1f, 0.1f, 2f));
+        
         
         walls.AddWallData (WallData.CreateStreight (10f, 10f, 10f, 15f, 0.1f, 2f));
         walls.AddWallData (WallData.CreateStreight (10f, 15f, 15f, 15f, 0.1f, 2f));
@@ -314,6 +319,8 @@ public class MeshMaker : MonoBehaviour
 
     private void Start ()
     {
+        Assert.raiseExceptions = true;
+        
 //        PlaneGenerationTest ();
 //        WallsTest ();
 //        StreightAndCurvedWallsTest ();

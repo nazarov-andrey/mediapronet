@@ -4,6 +4,7 @@ using System.Linq;
 using Geometry;
 using Model;
 using UnityEngine;
+using UnityEngine.Assertions;
 
 namespace RoomGeometry
 {
@@ -14,20 +15,18 @@ namespace RoomGeometry
             public readonly WallData Wall;
             public int Counter;
             public bool Deadlock;
-            public bool CheckedOnce;
 
             public WallUseCounter (WallData wall)
             {
                 Wall = wall;
                 Deadlock = false;
                 Counter = 0;
-                CheckedOnce = false;
             }
 
             public override string ToString ()
             {
                 return
-                    $"[WallUseCounter {nameof (Wall)}: {Wall}, {nameof (Counter)}: {Counter}, {nameof (Deadlock)}: {Deadlock}, {nameof (CheckedOnce)}: {CheckedOnce}]";
+                    $"[WallUseCounter {nameof (Wall)}: {Wall}, {nameof (Counter)}: {Counter}, {nameof (Deadlock)}: {Deadlock}]";
             }
         }
 
@@ -66,32 +65,30 @@ namespace RoomGeometry
             return result;
         }
 
-        private static Tuple<WallUseCounter[], bool> Find (
-            WallUseCounter wallUseCounter,
+        private static string RoomToString (WallData[] room)
+        {
+            return string.Join (",", Array.ConvertAll (room, x => x.ToString ()));
+        }
+
+        private static WallData[] FindRoom (
+            WallUseCounter wallCounter,
             bool useReversedWall,
-            PointWallsMap allPointWallsMap,
-            WallUseCounter[] room,
-            List<WallData[]> rooms,
+            PointWallsMap pointWallsMap,
+            ref WallUseCounter[] path,
             int depth = 0)
         {
-            wallUseCounter.CheckedOnce = true;
+            var indent = new string (' ', depth * 2);
+//            Debug.Log ($"{indent}Wall {wallCounter}");
+            Assert.IsTrue (depth < 10);
 
-/*            string indent = new string (' ', depth * 2);
-            Debug.Log (
-                $"{indent}Wall: {wallUseCounter.Wall}; useReversedWall: {useReversedWall}; room: {string.Join (",", Array.ConvertAll (room, x => x.Wall.ToString ()).ToArray ())}");*/
-
-            
-            if (room != null && room.Length > 0 && wallUseCounter == room[0]) {
-/*                Debug.Log (
-                    $"{indent}Found room {string.Join (",", Array.ConvertAll (room, x => x.Wall.ToString ()).ToArray ())}");*/
-                Array.ForEach (room, x => x.Counter++);
-                rooms.Add (room.Select (x => x.Wall).ToArray ());
-                return new Tuple<WallUseCounter[], bool> (room, true);
+            if (path != null && path.Length > 0 && wallCounter == path[0]) {
+                Array.ForEach (path, x => x.Counter++);
+                var room = path.Select (x => x.Wall).ToArray ();
+//                Debug.Log ($"{indent}Room found {RoomToString (room)}");
+                return room;
             }
 
-            room = AppendToArray (room, wallUseCounter);
-
-            var wall = wallUseCounter.Wall;
+            var wall = wallCounter.Wall;
             if (useReversedWall)
                 wall = wall.Reverse ();
 
@@ -100,62 +97,30 @@ namespace RoomGeometry
                 .Last ();
 
             var wallVector = wall.GetInverseVector ();
-            var allNextWalls = allPointWallsMap[end];
+            var allNextWalls = pointWallsMap[end];
             var nextWalls = allNextWalls
                 .Where (
-                    x => x != wallUseCounter && !x.Deadlock && x.Counter < 2)
+                    x => x != wallCounter && !x.Deadlock && x.Counter < 2)
                 .Select (x => GetNextWallData (wall, wallVector, x))
                 .OrderBy (x => x.Item3)
                 .ToList ();
 
-            if (nextWalls.Count == 0) {
-/*                Debug.Log (
-                    $"{indent} Deadlock {string.Join (",", Array.ConvertAll (room, x => x.Wall.ToString ()))}");*/
-                wallUseCounter.Deadlock = true;
-                return new Tuple<WallUseCounter[], bool> (room, false);
-            }
-
-            while (nextWalls.Count > 0) {
-                var neatestWall = nextWalls[0];
-                var solveResult = Find (
-                    neatestWall.Item1,
-                    neatestWall.Item2,
-                    allPointWallsMap,
-                    room,
-                    rooms,
+            path = AppendToArray (path, wallCounter);
+            foreach (var nextWall in nextWalls) {
+                var room = FindRoom (
+                    nextWall.Item1,
+                    nextWall.Item2,
+                    pointWallsMap,
+                    ref path,
                     depth + 1);
 
-/*                Debug.Log (
-                    $"{indent}roomFound {string.Join (",", Array.ConvertAll (solveResult.Item1, x => x.Wall.ToString ()))}; {solveResult.Item2}");*/
-                nextWalls.RemoveAt (0);
-
-                if (!solveResult.Item2) {
-                    room = solveResult.Item1;
-/*                    Debug.Log (
-                        $"{indent}room {string.Join (",", Array.ConvertAll (room, x => x.Wall.ToString ()))}");*/
-                    continue;
-                }
-
-                WallUseCounter[] q = null;
-                for (int count = nextWalls.Count, i = 0; i < count; i++) {
-                    solveResult = Find (
-                        nextWalls[i].Item1,
-                        nextWalls[i].Item2,
-                        allPointWallsMap,
-                        q,
-                        rooms,
-                        depth + 1);
-
-                    if (solveResult.Item2)
-                        q = null;
-                    else
-                        q = solveResult.Item1;
-                }
-
-                return new Tuple<WallUseCounter[], bool> (room, true);
+                if (room != null)
+                    return room;
             }
 
-            return new Tuple<WallUseCounter[], bool> (room, false);
+//            Debug.Log ($"{indent}Wall {wallCounter.Wall} deadlocked");
+            wallCounter.Deadlock = true;
+            return null;
         }
 
         public static WallData[][] FindRooms (Walls walls)
@@ -184,47 +149,45 @@ namespace RoomGeometry
                         .ToArray ());
             }
 
-            var allRooms = new List<WallData[]> ();
             var rooms = new List<WallData[]> ();
+            var vector2Comparer = new Vector2Comparer ();
+            var orderedWallCounters = wallCounterMap
+                .Values
+                .OrderBy (x => vector2Comparer.GetMin (x.Wall.Start, x.Wall.End), vector2Comparer)
+                .ToArray ();
+
+            var i = 0;
             do {
-                var startWall = wallCounterMap
-                    .Values
-                    .FirstOrDefault (x => !x.CheckedOnce);
+                Assert.IsTrue (++i < 10);
+                var startWall = orderedWallCounters
+                    .FirstOrDefault (x => x.Counter == 0);
 
                 if (startWall == null)
                     break;
 
-                rooms.Clear ();
-                Find (
-                    startWall,
-                    false,
-                    pointWallsMap,
-                    null,
-                    rooms);
-
-                /**
-                 * Remove 'superroom', ie room which includes all rooms in this group.
-                 * Such room include only 'shared' walls, ie walls with UseCount == 2.
-                 */
-                if (rooms.Count > 1) {
-                    var sorterRooms = rooms
-                        .OrderByDescending (x => x.Length)
-                        .ToArray ();
-                    for (int j = 0; j < sorterRooms.Length; j++) {
-                        if (rooms[j].All (x => wallCounterMap[x].Counter == 2)) {
-                            rooms.RemoveAt (j);
-                            break;
-                        }
-                    }
-                }
-
-                allRooms.AddRange (rooms);
+                WallUseCounter[] path = null;
+                var room = FindRoom (startWall, false, pointWallsMap, ref path);
+                Assert.IsNotNull (room);
+                rooms.Add (room);
             } while (true);
 
-            wallCounterMap.Clear ();
-            pointWallsMap.Clear ();
-            rooms.Clear ();
-            return allRooms.ToArray ();
+            /**
+             * Remove 'superroom', ie room which includes all rooms in this group.
+             * Such room include only 'shared' walls, ie walls with UseCount == 2.
+             */
+/*            if (rooms.Count > 1) {
+                var sorterRooms = rooms
+                    .OrderByDescending (x => x.Length)
+                    .ToArray ();
+                for (int j = 0; j < sorterRooms.Length; j++) {
+                    if (rooms[j].All (x => wallCounterMap[x].Counter == 2)) {
+                        rooms.RemoveAt (j);
+                        break;
+                    }
+                }
+            }*/
+
+            return rooms.ToArray ();
         }
     }
 }
