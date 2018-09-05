@@ -271,16 +271,6 @@ namespace RoomGeometry
                 .First ()
                 .Outer;
 
-/*            var prevLines = prevWall
-                ?.Lines
-                .Value
-                .Last ();
-
-            var nextLines = nextWall
-                ?.Lines
-                .Value
-                .First ();*/
-
             var startLines = wall
                 .Lines
                 .Value
@@ -301,13 +291,6 @@ namespace RoomGeometry
 
             if (!(prevOuterLine.HasValue && startLines.Outer.Cross (prevOuterLine.Value, out outerStart)))
                 outerStart = outerPoints.First ();
-
-/*            if (prevLines != null && prevLines.Inner.Cross (startLines.Inner, out innerStart)) {
-                Assert.IsTrue (prevLines.Outer.Cross (startLines.Outer, out outerStart));
-            } else {
-                innerStart = innerPoints.First ();
-                outerStart = outerPoints.First ();
-            }*/
 
             if (!(nextInnerLine.HasValue && endLines.Inner.Cross (nextInnerLine.Value, out innerEnd))) {
                 switch (wall.WidthChangeType) {
