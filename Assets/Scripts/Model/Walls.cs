@@ -231,7 +231,7 @@ namespace Model
 
         public override string ToString ()
         {
-            return $"[Wall start: {Points.First ()}; end: {Points.Last()}]";
+            return $"[Wall ({Points.First ()}; {Points.Last()})]";
         }
 
         public static WallData CreateStreight (

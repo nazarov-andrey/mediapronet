@@ -178,7 +178,7 @@ public class MeshMaker : MonoBehaviour
             nextInnerWall,
             nextOuterWall);
 
-        var wallTransform = new GameObject ("Wall").transform;
+        var wallTransform = new GameObject (wall.ToString()).transform;
         foreach (var mesh in meshes) {
             MeshGenerator
                 .CreateGameObject (mesh.name, mesh)

@@ -23,6 +23,12 @@ namespace RoomGeometry
                 Counter = 0;
                 CheckedOnce = false;
             }
+
+            public override string ToString ()
+            {
+                return
+                    $"[WallUseCounter {nameof (Wall)}: {Wall}, {nameof (Counter)}: {Counter}, {nameof (Deadlock)}: {Deadlock}, {nameof (CheckedOnce)}: {CheckedOnce}]";
+            }
         }
 
         class PointWallsMap : Dictionary<Vector2, WallUseCounter[]>
@@ -48,9 +54,14 @@ namespace RoomGeometry
 
         private static T[] AppendToArray<T> (T[] array, T value)
         {
-            var result = new T[array.Length + 1];
-            Array.Copy (array, result, array.Length);
-            result[result.Length - 1] = value;
+            var length = array?.Length + 1 ?? 1;
+            var result = new T[length];
+            if (array == null) {
+                result[0] = value;
+            } else {
+                Array.Copy (array, result, array.Length);
+                result[result.Length - 1] = value;
+            }
 
             return result;
         }
@@ -65,11 +76,12 @@ namespace RoomGeometry
         {
             wallUseCounter.CheckedOnce = true;
 
-            string indent = new string (' ', depth * 2);
-/*            Debug.Log (
+/*            string indent = new string (' ', depth * 2);
+            Debug.Log (
                 $"{indent}Wall: {wallUseCounter.Wall}; useReversedWall: {useReversedWall}; room: {string.Join (",", Array.ConvertAll (room, x => x.Wall.ToString ()).ToArray ())}");*/
 
-            if (room.Length > 0 && wallUseCounter == room[0]) {
+            
+            if (room != null && room.Length > 0 && wallUseCounter == room[0]) {
 /*                Debug.Log (
                     $"{indent}Found room {string.Join (",", Array.ConvertAll (room, x => x.Wall.ToString ()).ToArray ())}");*/
                 Array.ForEach (room, x => x.Counter++);
@@ -124,14 +136,20 @@ namespace RoomGeometry
                     continue;
                 }
 
+                WallUseCounter[] q = null;
                 for (int count = nextWalls.Count, i = 0; i < count; i++) {
-                    Find (
+                    solveResult = Find (
                         nextWalls[i].Item1,
                         nextWalls[i].Item2,
                         allPointWallsMap,
-                        new WallUseCounter[0],
+                        q,
                         rooms,
                         depth + 1);
+
+                    if (solveResult.Item2)
+                        q = null;
+                    else
+                        q = solveResult.Item1;
                 }
 
                 return new Tuple<WallUseCounter[], bool> (room, true);
@@ -181,7 +199,7 @@ namespace RoomGeometry
                     startWall,
                     false,
                     pointWallsMap,
-                    new WallUseCounter[0],
+                    null,
                     rooms);
 
                 /**
@@ -189,9 +207,10 @@ namespace RoomGeometry
                  * Such room include only 'shared' walls, ie walls with UseCount == 2.
                  */
                 if (rooms.Count > 1) {
-                    var max = rooms[0].Length;
-                    var maxIndex = 0;
-                    for (int count = rooms.Count, j = 1; j < count; j++) {
+                    var sorterRooms = rooms
+                        .OrderByDescending (x => x.Length)
+                        .ToArray ();
+                    for (int j = 0; j < sorterRooms.Length; j++) {
                         if (rooms[j].All (x => wallCounterMap[x].Counter == 2)) {
                             rooms.RemoveAt (j);
                             break;
